@@ -1,0 +1,70 @@
+
+# ## Archivo .gitignore para el Backend de SPEAS ERP ##
+
+# 1. Dependencias de Node.js
+# La carpeta node_modules se genera automáticamente al ejecutar 'npm install'.
+# Nunca debe subirse a GitHub. Pesa mucho y cada desarrollador la instala en su máquina.
+/node_modules
+
+# 2. Archivos de Entorno (.env)
+# ¡LA REGLA MÁS IMPORTANTE!
+# Este archivo contiene todas tus contraseñas y secretos (base de datos, JWT_SECRET, etc.).
+# Es información ultra sensible y NUNCA debe estar en un repositorio público.
+.env
+
+# 3. Archivos de Build de TypeScript
+# Si compilas tu TypeScript a JavaScript, se generará una carpeta (comúnmente 'dist' o 'build').
+# Esta carpeta es código generado, no el código fuente, por lo que no se sube.
+/dist
+/build
+
+# 4. Logs y Archivos de Depuración
+# Archivos de log que puedan generar tu aplicación o herramientas.
+# A menudo contienen información sensible sobre errores o datos de usuarios.
+*.log
+npm-debug.log*
+yarn-error.log
+yarn-debug.log
+lerna-debug.log*
+
+# 5. Archivos del Sistema Operativo
+# Archivos basura generados por diferentes sistemas operativos.
+.DS_Store
+Thumbs.db
+
+# 6. Archivos del Editor de Código
+# Configuraciones específicas de tu editor que no son necesarias para otros desarrolladores.
+.vscode/
+.idea/
+
+# 7. Archivos de Cobertura de Pruebas
+# Si en el futuro implementas pruebas, estos son los reportes generados.
+/coverage
+.nyc_output
+
+# 8. Archivos de Paquetes
+# Archivos que se generan al empaquetar la aplicación.
+*.tsbuildinfo
+.npm
+.eslintcache
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

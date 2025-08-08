@@ -1,0 +1,226 @@
+/* Archivo: frontend/src/components/layout/MainLayout.css (VERSIÓN SIMPLIFICADA Y CORREGIDA) */
+
+:root {
+    --sidebar-bg: #ffffff;
+    --content-bg: #f7f9fc;
+    --border-color: #eef2f7;
+    --text-color: #525f7f;
+    --icon-color: #a0aec0;
+    --header-text-color: #172b4d;
+    --active-text-color: #3b82f6;
+    --active-bg-color: #eff6ff; /* Se usará solo para el hover */
+    --ripple-color: rgba(59, 130, 246, 0.2);
+}
+
+.main-layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+.sidebar {
+    width: 260px;
+    background-color: var(--sidebar-bg);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    height: 100%;
+    transition: width 0.3s ease;
+    border-right: 1px solid var(--border-color);
+}
+
+.sidebar-header {
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 80px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sidebar-logo {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    background-color: var(--active-bg-color);
+}
+
+.sidebar-header h3 {
+    margin: 0;
+    font-size: 1.9rem;
+    font-weight: 900;
+    background: linear-gradient(90deg, #305389, #bda1cf, #3b82f6);
+    background-size: 200% auto;
+    color: #fff;
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: text-gradient-animation 4s linear infinite;
+}
+
+@keyframes text-gradient-animation {
+    to {
+        background-position: 200% center;
+    }
+}
+
+
+.sidebar-nav {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 1rem 0.75rem;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+    width: 6px;
+}
+.sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background-color: #dce5f1;
+    border-radius: 10px;
+}
+
+.nav-link, .menu-header-button {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+    margin: 0.15rem 0;
+    text-decoration: none;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-size: 0.95rem;
+    cursor: pointer;
+    text-align: left;
+    transition: transform 0.2s ease, background-color 0.3s ease;
+}
+
+.nav-link span, .menu-header-button span,
+.nav-link svg, .menu-header-button svg {
+    color: var(--text-color);
+    transition: color 0.3s ease;
+}
+
+.nav-link svg, .menu-header-button svg {
+    color: var(--icon-color);
+}
+
+/* --- Efecto Hover --- */
+.nav-link:hover, .menu-header-button:hover {
+    background-color: var(--active-bg-color);
+}
+
+.nav-link:hover span, .menu-header-button:hover span,
+.nav-link:hover svg, .menu-header-button:hover svg {
+    color: var(--active-text-color);
+}
+
+/* --- Estilos para el Item Activo (SOLO TEXTO Y ICONO) --- */
+.nav-link.active {
+    background-color: transparent; /* CORRECCIÓN: Se quita el fondo persistente */
+}
+
+.nav-link.active span, .nav-link.active svg {
+    color: var(--active-text-color);
+    font-weight: 600;
+}
+
+/* --- Estilos para el Padre de un Item Activo (SOLO TEXTO Y ICONO) --- */
+.menu-header-button.parent-active {
+    background-color: transparent !important; 
+}
+.menu-header-button.parent-active span,
+.menu-header-button.parent-active svg {
+    color: var(--active-text-color);
+}
+
+.menu-header-button {
+    font-weight: 600;
+}
+.menu-header-button span {
+    font-size: 1rem;
+    color: var(--header-text-color);
+}
+
+.chevron-icon {
+    margin-left: auto;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.chevron-icon.open {
+    transform: rotate(180deg);
+}
+
+.submenu {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease-in-out;
+    padding-left: 1.25rem;
+}
+
+.submenu.open {
+    max-height: 300px;
+}
+
+.submenu .nav-link {
+    padding-left: 2.75rem;
+    font-size: 0.9rem;
+}
+
+/* --- EFECTO DE ONDA RADIAL (RIPPLE) --- */
+.nav-link .ripple, .menu-header-button .ripple {
+    position: absolute;
+    border-radius: 50%;
+    background-color: var(--ripple-color);
+    animation: ripple-animation 0.6s linear;
+    transform: scale(0);
+}
+
+@keyframes ripple-animation {
+    to {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+
+.sidebar-footer {
+    padding: 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.logout-button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background-color: #f1f3f5;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.logout-button:hover {
+    background-color: #dc3545;
+    color: #ffffff;
+    border-color: #dc3545;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(220, 53, 69, 0.2);
+}
+
+.main-content {
+    flex-grow: 1;
+    margin-left: 260px;
+    padding: 2.5rem;
+    background-color: var(--content-bg);
+}

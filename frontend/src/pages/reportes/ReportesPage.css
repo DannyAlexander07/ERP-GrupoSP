@@ -1,0 +1,98 @@
+/* Archivo: frontend/src/pages/reportes/ReportesPage.css */
+
+.report-form-container {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 2rem 2.5rem;
+    max-width: 900px;
+    margin: 2rem auto;
+    box-shadow: 0 7px 14px 0 rgba(60, 66, 87, 0.08), 0 3px 6px 0 rgba(0, 0, 0, 0.08);
+}
+
+.report-description {
+    color: #525f7f;
+    margin-bottom: 2.5rem;
+    text-align: center;
+    font-size: 1rem;
+}
+
+.form-grid-report {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 2rem;
+    align-items: end;
+}
+
+.form-actions-report {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #eef2f7;
+}
+
+.report-results-container {
+    margin-top: 2.5rem;
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 2rem 2.5rem;
+    box-shadow: 0 7px 14px 0 rgba(60, 66, 87, 0.08), 0 3px 6px 0 rgba(0, 0, 0, 0.08);
+}
+
+.report-results-container h3 {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: #172b4d;
+}
+
+.report-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 2rem;
+}
+
+.report-table th, .report-table td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.report-table th {
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.report-header-ingresos { background-color: #28a745; }
+.report-header-gastos { background-color: #dc3545; }
+
+.report-table .text-right {
+    text-align: right;
+}
+
+.report-table .report-total-row td {
+    font-weight: 700;
+    background-color: #f8f9fa;
+    border-top: 2px solid #dee2e6;
+}
+
+.report-summary {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 700;
+    font-size: 1.2rem;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+}
+
+.report-summary.profit {
+    background-color: #e6fffa;
+    color: #2c7a7b;
+}
+
+.report-summary.loss {
+    background-color: #fff5f5;
+    color: #c53030;
+}
+
+/* Reutilizamos los estilos de .form-group y .floating-label de TablePage.css */

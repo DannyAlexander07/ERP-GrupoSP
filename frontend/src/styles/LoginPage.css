@@ -1,0 +1,190 @@
+/* Archivo: frontend/src/styles/LoginPage.css (VERSIÓN "GENIAL MAESTRO") */
+
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 1rem;
+    
+    /* --- FONDO DE IMAGEN --- */
+    /* IMPORTANTE: Reemplaza esta URL con la ruta a tu propia imagen. */
+    background-image: url('../assets/gruposp.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    overflow: hidden; /* Evita barras de scroll por las animaciones */
+}
+
+@keyframes fadeInScaleUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.login-card {
+    width: 100%;
+    max-width: 380px; /* --- Más compacto --- */
+    padding: 2.5rem;
+    border-radius: 20px;
+    text-align: center;
+    
+    /* --- EFECTO DE CRISTAL OSCURO --- */
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+
+    animation: fadeInScaleUp 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.login-logo {
+    width: 72px;
+    height: 70px;
+    margin-bottom: 1rem;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 0.1rem solid rgba(230, 215, 215, 0.818);
+    animation: breathe 5s ease-in-out infinite;
+}
+
+.login-logo:hover{
+    box-shadow: 0 0 0.3rem 0.2rem #ffffff;
+}
+
+.login-card h2 {
+    margin-bottom: 0.5rem;
+    font-size: 1.2rem;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.login-card p {
+    margin-bottom: 2.5rem;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1.4rem;
+}
+
+.input-group {
+    position: relative; /* Necesario para la línea animada */
+    text-align: left;
+    margin-bottom: 2rem;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+    transition: color 0.3s ease;
+}
+
+/* --- NUEVOS ESTILOS DE INPUT --- */
+.input-group input {
+    width: 100%;
+    padding: 0.75rem 0.25rem; /* Más padding abajo para la línea */
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    font-size: 1.1rem;
+    background-color: transparent;
+    color: #ffffff;
+    transition: all 0.3s ease;
+}
+
+.input-group input:focus {
+    outline: none;
+}
+
+/* --- LÍNEA ANIMADA PARA EL INPUT --- */
+.input-group::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s cubic-bezier(0.6, 0, 0.4, 1);
+}
+
+.input-group input:focus + label, /* No funciona con la estructura actual, pero lo dejamos por si cambia */
+.input-group input:focus ~ label {
+    color: #60a5fa;
+}
+/* Alternativa para cambiar el color del label con JS o si la estructura cambia */
+.input-group:focus-within label {
+    color: #60a5fa;
+}
+.input-group:focus-within::after {
+    transform: scaleX(1);
+}
+
+
+/* --- BOTÓN CON NUEVO EFECTO DE BRILLO --- */
+.login-button {
+    width: 100%;
+    padding: 0.9rem;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    background: #3b82f6;
+    transition: all 0.3s ease;
+}
+
+.login-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+}
+
+.login-button::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.4s ease, height 0.4s ease;
+}
+
+.login-button:hover::before {
+    width: 310px;
+    height: 200px;
+}
+
+.login-button:disabled {
+    background: #adb5bd;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+.error-message {
+    color: #f87171;
+    background-color: rgba(239, 68, 68, 0.15);
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    font-weight: 500;
+}

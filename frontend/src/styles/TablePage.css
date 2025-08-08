@@ -1,0 +1,530 @@
+/* Archivo: frontend/src/styles/TablePage.css (VERSIÓN FINAL CON FILTROS Y PAGINACIÓN Y DROPDOWN CLICK) */
+
+.table-page-container {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.table-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.table-page-header h1 {
+    font-size: 1.8rem;
+    color: #172b4d;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.btn-primary, .btn-secondary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background-color: #3b82f6;
+    color: white;
+    box-shadow: 0 4px 6px rgba(50, 50, 93, 0.11), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.btn-primary:hover {
+    background-color: #2563eb;
+    transform: translateY(-2px);
+}
+
+.btn-secondary {
+    background-color: #ffffff;
+    color: #495057;
+    border-color: #ced4da;
+}
+
+.btn-secondary:hover {
+    background-color: #f8f9fa;
+    border-color: #adb5bd;
+    transform: translateY(-2px);
+}
+
+
+.table-container {
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 7px 14px 0 rgba(60, 66, 87, 0.08), 0 3px 6px 0 rgba(0, 0, 0, 0.08);
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 800px;
+}
+
+thead {
+    background-color: #f7f9fc;
+}
+
+th {
+    padding: 1rem 1.5rem;
+    text-align: left;
+    font-size: 0.8rem;
+    color: #8898aa;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    white-space: nowrap;
+}
+
+tbody tr {
+    border-bottom: 1px solid #eef2f7;
+}
+
+tbody tr:last-child {
+    border-bottom: none;
+}
+
+td {
+    padding: 1rem 1.5rem;
+    color: #525f7f;
+    font-size: 0.9rem;
+}
+
+.filter-row {
+    background-color: #fdfdfe;
+}
+
+.filter-row td {
+    padding: 0.5rem 1rem;
+}
+
+.filter-row input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d2d6da;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.filter-row input::placeholder {
+    color: #adb5bd;
+}
+
+.filter-row input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.filter-actions {
+    text-align: center;
+}
+
+
+.no-data {
+    text-align: center;
+    padding: 3rem;
+    color: #8898aa;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.status-activo {
+    background-color: #e6fffa;
+    color: #319795;
+}
+
+.status-inactivo {
+    background-color: #fff5f5;
+    color: #e53e3e;
+}
+
+.user-badge {
+    display: inline-block;
+    padding: 0.3rem 0.8rem;
+    border-radius: 16px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    background-color: #f0f2f5;
+    color: #495057;
+    border: 1px solid #dee2e6;
+    white-space: nowrap;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    margin-right: 0.5rem;
+    opacity: 0.7;
+    transition: all 0.2s;
+}
+
+.btn-icon:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.btn-danger:hover {
+    color: #e53e3e;
+}
+
+.loading-spinner {
+    text-align: center;
+    padding: 4rem;
+    font-size: 1.2rem;
+    color: #8898aa;
+}
+
+.pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    color: #525f7f;
+    font-size: 0.9rem;
+}
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pagination-controls button {
+    background-color: #ffffff;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pagination-controls button:hover:not(:disabled) {
+    background-color: #f8f9fa;
+    border-color: #adb5bd;
+}
+
+.pagination-controls button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.pagination-controls span {
+    margin: 0 0.5rem;
+}
+
+/* --- Estilos para la sección de Auditoría --- */
+.audit-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.audit-section h4 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+    color: #495057;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 0.5rem;
+}
+
+.audit-section p {
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+    color: #525f7f;
+    display: flex;
+    justify-content: space-between;
+}
+
+.audit-section p strong {
+    font-weight: 600;
+    color: #344767;
+}
+
+
+/* --- NUEVOS ESTILOS PARA EL MODAL Y FORMULARIO --- */
+
+/* CORRECCIÓN: Estilos para el Modal para que no se desborde */
+.modal-overlay {
+    padding: 2rem; /* Añade un padding para que el modal nunca toque los bordes */
+}
+
+.modal-content {
+    max-width: 600px !important; /* Hacemos el modal más compacto */
+    width: 100%;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    /* NUEVO: Fondo sutil y sombra refinada */
+    background-color: #ffffff;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23f0f2f5' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.modal-body {
+    overflow-y: auto;
+    padding-right: 1rem;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    row-gap: 1rem; /* Espacio vertical entre filas */
+}
+
+.form-group.full-width {
+    grid-column: 1 / -1; /* Hace que el campo ocupe todo el ancho */
+}
+
+.form-section-title {
+    grid-column: 1 / -1; /* Ocupa todo el ancho */
+    margin-top: 1.5rem;
+    margin-bottom: -0.5rem;
+    padding-bottom: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--header-text-color);
+    border-bottom: 1px solid var(--border-color);
+}
+
+
+/* --- Estilos para Inputs con Etiquetas Flotantes --- */
+.form-group.floating-label {
+    position: relative;
+    margin-top: 1.2rem; 
+}
+
+.form-group.floating-label input,
+.form-group.floating-label select,
+.form-group.floating-label textarea {
+    border: none;
+    border-bottom: 2px solid #d2d6da;
+    background-color: transparent;
+    border-radius: 0;
+    padding: 0.75rem 0.25rem 0.5rem;
+    width: 100%;
+    font-size: 1rem;
+    position: relative;
+    z-index: 1;
+}
+
+/* CORRECCIÓN: Se elimina el outline negro al hacer focus */
+.form-group.floating-label input:focus,
+.form-group.floating-label select:focus,
+.form-group.floating-label textarea:focus {
+    outline: none;
+}
+
+
+.form-group.floating-label label {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.25rem;
+    color: #8898aa;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.form-group.floating-label input:focus + label,
+.form-group.floating-label input:not(:placeholder-shown) + label,
+.form-group.floating-label textarea:focus + label,
+.form-group.floating-label textarea:not(:placeholder-shown) + label,
+.form-group.floating-label select:not([value=""]) + label {
+    top: -1rem;
+    left: 0;
+    font-size: 0.75rem;
+    color: var(--active-text-color);
+    font-weight: 600;
+}
+
+.input-line {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--active-text-color);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s cubic-bezier(0.6, 0, 0.4, 1);
+}
+
+.form-group.floating-label input:focus ~ .input-line,
+.form-group.floating-label textarea:focus ~ .input-line {
+    transform: scaleX(1);
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 60px;
+    font-family: inherit;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.btn-secondary {
+    background-color: #f8f9fa;
+    color: #495057;
+    border: 1px solid #ced4da;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    background-color: #e9ecef;
+}
+
+/* --- Estilos para Validación --- */
+.form-group .error-text {
+    color: #e53e3e;
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+}
+
+.form-group input.error,
+.form-group select.error,
+.form-group textarea.error {
+    border-color: #e53e3e !important;
+}
+
+.form-group.floating-label:has(input.error) .input-line,
+.form-group.floating-label:has(textarea.error) .input-line {
+    background: #e53e3e !important;
+    transform: scaleX(1);
+}
+
+.user-badge {
+    display: inline-block;
+    padding: 0.3rem 0.8rem;
+    border-radius: 16px;
+    font-weight: 600;
+    font-size: 0.8rem;
+    background-color: #e6fffa; /* Un verde menta muy claro */
+    color: #2c7a7b; /* Un verde azulado oscuro para el texto */
+    border: 1px solid #b2f5ea; /* Un borde sutil del mismo tono */
+    white-space: nowrap;
+}
+
+
+/* --- NUEVOS ESTILOS PARA EL CHECKBOX --- */
+.form-group.checkbox-group {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    /* Reseteamos algunos estilos de floating-label que no aplican aquí */
+    padding-top: 0.75rem; 
+}
+
+.form-group.checkbox-group input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    /* Quitamos los estilos de input de texto */
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+}
+
+.form-group.checkbox-group label {
+    /* Reseteamos la posición de la etiqueta flotante */
+    position: static;
+    top: auto;
+    left: auto;
+    font-size: 1rem; /* Tamaño normal */
+    color: var(--text-color);
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+/* --- ESTILOS PARA EL DROPDOWN DE ACCIONES --- */
+.dropdown-actions {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: #f9f9f9;
+    min-width: 160px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1;
+    border-radius: 8px;
+    overflow: hidden; /* Para que los bordes redondeados se apliquen a los items */
+    right: 0; /* Alinea el dropdown a la derecha del botón */
+    top: 100%; /* Coloca el dropdown debajo del botón */
+    margin-top: 5px; /* Pequeño espacio entre el botón y el dropdown */
+}
+
+.dropdown-content.open { /* ¡CAMBIO AQUÍ! Clase 'open' para mostrar el dropdown */
+    display: block;
+}
+
+.dropdown-content a {
+    color: #333;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    text-align: left;
+    font-size: 0.9rem;
+    transition: background-color 0.2s ease;
+}
+
+.dropdown-content a:hover {
+    background-color: #f1f1f1;
+}
+
+/* Se elimina el :hover para mostrar el dropdown, ahora se controla con JS */
+/* .dropdown-actions:hover .dropdown-content {
+    display: block;
+} */
+
+/* Ajuste para que los botones de acción estén cerca */
+td .btn-icon {
+    margin-right: 0.2rem; /* Reduce el margen entre iconos */
+}

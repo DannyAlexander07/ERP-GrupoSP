@@ -1,0 +1,230 @@
+/* Archivo: frontend/src/pages/dashboard/DashboardPage.css */
+
+.dashboard-container {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+.dashboard-title {
+    font-size: 2rem;
+    color: #172b4d;
+    margin-bottom: 2rem;
+}
+
+/* Grid para las tarjetas de KPI */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+}
+
+.kpi-card {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    box-shadow: 0 7px 14px 0 rgba(60, 66, 87, 0.08), 0 3px 6px 0 rgba(0, 0, 0, 0.08);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px 0 rgba(60, 66, 87, 0.12), 0 4px 8px 0 rgba(0, 0, 0, 0.1);
+}
+
+.kpi-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f0f2f5;
+}
+
+.kpi-icon svg {
+    width: 28px;
+    height: 28px;
+    color: #3b82f6;
+}
+
+.kpi-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.kpi-title {
+    font-size: 0.9rem;
+    color: #8898aa;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.kpi-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #344767;
+}
+
+/* Grid para los gráficos y resúmenes */
+.charts-grid, .summaries-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+}
+
+.chart-container, .summary-container {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 1.5rem 1rem;
+    box-shadow: 0 7px 14px 0 rgba(60, 66, 87, 0.08), 0 3px 6px 0 rgba(0, 0, 0, 0.08);
+    overflow: hidden; 
+}
+
+.chart-container h3, .summary-container h3 {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    font-size: 1.1rem;
+    color: #172b4d;
+}
+
+.chart-placeholder, .summary-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 250px;
+    background-color: #f7f9fc;
+    border-radius: 8px;
+    color: #adb5bd;
+    font-weight: 500;
+}
+
+
+.summary-container h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.summary-table-container {
+    margin-top: 1rem;
+    overflow-x: auto;
+}
+
+.summary-table-container table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 400px; 
+}
+
+.summary-table-container th,
+.summary-table-container td {
+    text-align: left;
+    padding: 0.8rem;
+    border-bottom: 1px solid #eef2f7;
+    font-size: 0.9rem;
+}
+
+.summary-table-container th {
+    font-weight: 600;
+    color: #8898aa;
+    background-color: #f7f9fc;
+}
+
+.summary-table-container tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.summary-table-container .saldo-pendiente {
+    font-weight: 600;
+    color: #e53e3e; /* Rojo para deudas */
+}
+
+.summary-table-container .no-data-small {
+    text-align: center;
+    padding: 2rem;
+    color: #adb5bd;
+}
+
+.additional-charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); 
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+}
+
+
+.donut-chart-with-summary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.chart-summary {
+    width: 100%;
+}
+
+.chart-summary h4 {
+    text-align: center;
+    font-size: 1.1rem;
+    color: #344767;
+    margin-bottom: 1rem;
+}
+
+.chart-summary ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.chart-summary li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.chart-container.full-width {
+    grid-column: 1 / -1;
+}
+
+
+.summary-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.summary-label {
+    font-size: 0.9rem;
+    color: #525f7f;
+}
+
+.summary-value {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #344767;
+}
+
+/* Ajuste para que la leyenda del gráfico de dona no se muestre, ya que tenemos la nuestra */
+.apexcharts-legend {
+    display: none;
+}
+
+.summary-table-container .saldo-por-pagar {
+    font-weight: 600;
+    color: #e53e3e; /* Rojo para deudas */
+}
+
+.summary-table-container .saldo-por-cobrar {
+    font-weight: 600;
+    color: #28a745; /* Verde para saldos a favor */
+}
+
