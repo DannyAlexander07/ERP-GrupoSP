@@ -1,163 +1,127 @@
-SPEAS - Sistema ERP Integral
-SPEAS es un sistema de planificación de recursos empresariales (ERP) diseñado para la gestión integral de empresas de servicios. Desarrollado con un stack moderno de JavaScript, permite un control detallado sobre las operaciones comerciales y financieras, desde la gestión de clientes y proyectos hasta la contabilidad automatizada y la generación de reportes financieros.
+# 🚀 SPEAS - SISTEMA ERP INTEGRAL
 
-Tabla de Contenidos
-Características Principales
+SPEAS es un sistema de planificación de recursos empresariales (ERP) full-stack, diseñado desde cero para la **gestión integral de empresas de servicios**.  
+Desarrollado con un **stack moderno JavaScript/TypeScript**, permite un control detallado sobre operaciones comerciales, financieras y contables, centralizando la información crítica del negocio en una interfaz moderna e intuitiva.
 
-Stack Tecnológico
+---
 
-Instalación y Puesta en Marcha
+## 📜 Tabla de Contenidos
+1. [✨ Características Principales](#-características-principales)
+2. [🛠️ Stack Tecnológico](#️-stack-tecnológico)
+3. [🚀 Instalación y Puesta en Marcha](#-instalación-y-puesta-en-marcha)
+4. [📂 Estructura del Proyecto](#-estructura-del-proyecto)
 
-Prerrequisitos
+---
 
-Base de Datos
+## ✨ Características Principales
 
-Backend
+**<img src="https://raw.githubusercontent.com/lucide-icons/lucide/master/icons/layout-dashboard.svg" width="20"> Dashboard Gerencial**
+- Visualización de KPIs en tiempo real (Ventas, Cuentas por Cobrar/Pagar).
+- Gráficos interactivos para análisis de Flujo de Caja, Resumen Anual, Top 5 Clientes/Proveedores y más.
+- Reportes financieros visuales como Estado de Resultados en formato cascada y rentabilidad por cliente.
 
-Frontend
+**<img src="https://raw.githubusercontent.com/lucide-icons/lucide/master/icons/users.svg" width="20"> Módulo de Maestros**
+- Gestión centralizada de Clientes, Proveedores y Servicios.
+- Mantenimiento de un Plan de Cuentas contable detallado.
 
-Estructura del Proyecto
+**<img src="https://raw.githubusercontent.com/lucide-icons/lucide/master/icons/dollar-sign.svg" width="20"> Módulo de Ventas y CRM**
+- Creación, seguimiento y anulación de facturas de venta.
+- Registro de pagos recibidos y manejo de saldos a favor.
+- Aplicación de saldos a facturas pendientes.
 
-Próximos Pasos
+**<img src="https://raw.githubusercontent.com/lucide-icons/lucide/master/icons/shopping-cart.svg" width="20"> Módulo de Compras**
+- Registro de facturas de compra y control de cuentas por pagar.
+- Seguimiento del estado de deudas con proveedores.
 
-Características Principales
-Dashboard Gerencial: Visualización en tiempo real de KPIs, flujo de caja, rentabilidad por cliente y más, a través de gráficos interactivos.
+**<img src="https://raw.githubusercontent.com/lucide-icons/lucide/master/icons/landmark.svg" width="20"> Módulo de Tesorería**
+- Gestión de cuentas bancarias propias en múltiples monedas.
+- Registro y control de todos los pagos realizados y recibidos.
 
-Módulo de Maestros: Gestión centralizada de Clientes, Proveedores y Servicios.
+**<img src="https://raw.githubusercontent.com/lucide-icons/lucide/master/icons/book-open.svg" width="20"> Módulo de Contabilidad**
+- Generación automática de asientos contables.
+- Visualización y mantenimiento del libro diario.
 
-Ciclo de Ventas: Creación y seguimiento de Facturas de Venta, con cálculo de saldos pendientes.
+**<img src="https://raw.githubusercontent.com/lucide-icons/lucide/master/icons/file-text.svg" width="20"> Módulo de Reportes**
+- Reportes como Estado de Resultados y Balance General.
+- Exportación de datos a Excel.
+- Base para Libros Electrónicos (PLE) para SUNAT.
 
-Ciclo de Compras: Registro de Facturas de Compra (Obligaciones) y control de cuentas por pagar.
+**<img src="https://raw.githubusercontent.com/lucide-icons/lucide/master/icons/settings-2.svg" width="20"> Configuración y Seguridad**
+- Gestión de usuarios, empresas y roles.
+- Backend protegido por JWT y contraseñas encriptadas con bcrypt.js.
 
-Módulo de Tesorería:
+---
 
-Gestión de Cuentas Bancarias Propias.
+## 🛠️ Stack Tecnológico
 
-Registro de Pagos Realizados y Recibidos.
+| Área             | Tecnología / Herramienta                          | Descripción |
+|------------------|---------------------------------------------------|-------------|
+| **Backend**      | **Node.js con TypeScript**                         | Entorno de ejecución para JavaScript del lado del servidor. |
+|                  | **Express.js**                                     | Framework minimalista para la construcción de la API RESTful. |
+|                  | **PostgreSQL**                                     | Base de datos relacional para la persistencia de datos. |
+|                  | **JWT** & **bcrypt.js**                            | Autenticación segura y encriptación de contraseñas. |
+| **Frontend**     | **React 19 con TypeScript**                        | Librería para construir la interfaz de usuario. |
+|                  | **Vite**                                           | Herramienta de desarrollo frontend de alta velocidad. |
+|                  | **React Router**                                   | Gestión de rutas y navegación en la aplicación. |
+|                  | **Axios**                                          | Cliente HTTP para la comunicación con el backend. |
+|                  | **ApexCharts**                                     | Creación de gráficos interactivos y dinámicos. |
+|                  | **CSS Plano**                                      | Estilos personalizados para un diseño limpio y moderno. |
+| **Librerías Clave** | **SweetAlert2**                                 | Notificaciones y alertas atractivas. |
+|                  | **Lucide-React**                                   | Iconografía limpia y consistente. |
+|                  | **File-Saver** & **xlsx**                          | Exportación de datos a formato Excel. |
 
-Manejo de Saldos a Favor de clientes (pagos por adelantado).
+---
 
-Módulo de Contabilidad:
+## 🚀 Instalación y Puesta en Marcha
 
-Plan de Cuentas personalizable.
+### 📋 Prerrequisitos
+- Node.js **v18+**
+- npm o yarn
+- PostgreSQL **v14+**
 
-Generación automática de asientos contables a partir de ventas y compras.
-
-Gestión de Proyectos y Préstamos: Seguimiento de proyectos y control de planes de pago para préstamos recibidos u otorgados.
-
-Reportes Financieros y Fiscales:
-
-Generación de Libros Electrónicos (PLE) para SUNAT (Compras y Ventas).
-
-Emisión del Estado de Resultados por rango de fechas.
-
-Emisión del Balance General a una fecha de corte.
-
-Configuración y Seguridad: Gestión de Usuarios, Empresas y Roles con un sistema de permisos en el backend.
-
-Stack Tecnológico
-Backend
-Lenguaje: TypeScript
-
-Entorno: Node.js
-
-Framework: Express.js
-
-Base de Datos: PostgreSQL
-
-Autenticación: JSON Web Tokens (JWT)
-
-Librerías Clave: pg (cliente de PostgreSQL), bcrypt (hashing de contraseñas), jsonwebtoken, cors, xlsx (exportar a Excel).
-
-Frontend
-Lenguaje: TypeScript
-
-Framework: React 19 (con Vite)
-
-Enrutamiento: react-router-dom
-
-Comunicación API: axios
-
-UI y Estilos:
-
-CSS plano con diseño moderno.
-
-lucide-react para iconografía.
-
-sweetalert2 para notificaciones.
-
-Gráficos y Visualización: react-apexcharts.
-
-Instalación y Puesta en Marcha
-Sigue estos pasos para levantar el proyecto en un entorno de desarrollo.
-
-Prerrequisitos
-Node.js (versión 18 o superior)
-
-npm o yarn
-
-PostgreSQL (versión 14 o superior)
-
-Base de Datos
-Crear la Base de Datos: Abre tu cliente de PostgreSQL (pgAdmin, DBeaver) y crea una nueva base de datos.
-
-SQL
-
+### 1️⃣ Base de Datos
+```bash
+# Crear base de datos
 CREATE DATABASE bd_erp;
-Ejecutar el Esquema Inicial: Abre el archivo .sql original que contiene todas las sentencias CREATE TABLE y ejecútalo sobre la base de datos bd_erp.
+```
 
-Ejecutar las Actualizaciones del Esquema: Hemos realizado mejoras en la base de datos. Ejecuta los siguientes comandos para aplicar las actualizaciones:
+### 2️⃣ Backend
+```bash
+Copiar
+Editar
+cd backend
+npm install
+cp .env.example .env
+nano .env
+npm run dev
+```
+Backend disponible en: http://localhost:4000
+# Ejecutar script inicial para tablas
+# Ejecutar scripts de actualización (ALTER TABLE)
 
-SQL
-
--- 1. Añadir columna de saldo a favor en clientes
-ALTER TABLE public.clientes ADD COLUMN saldo_a_favor numeric(18, 2) NOT NULL DEFAULT 0.00;
-
--- 2. Cambiar el tipo de la columna logo_url en empresas
-ALTER TABLE public.empresas ALTER COLUMN logo_url TYPE TEXT;
-
--- 3. Convertir todas las llaves primarias a autoincrementables (IDENTITY)
--- (Ejecuta esto para cada tabla principal para evitar errores de llave duplicada)
-DO $$
-DECLARE
-    rec RECORD;
-BEGIN
-    FOR rec IN 
-        SELECT tc.table_name, kcu.column_name
-        FROM information_schema.table_constraints AS tc 
-        JOIN information_schema.key_column_usage AS kcu ON tc.constraint_name = kcu.constraint_name
-        JOIN information_schema.columns AS c ON c.table_name = tc.table_name AND c.column_name = kcu.column_name
-        WHERE tc.constraint_type = 'PRIMARY KEY' AND c.data_type = 'integer'
-    LOOP
-        EXECUTE format('ALTER TABLE public.%I ALTER COLUMN %I DROP DEFAULT;', rec.table_name, rec.column_name);
-        EXECUTE format('ALTER TABLE public.%I ALTER COLUMN %I ADD GENERATED BY DEFAULT AS IDENTITY;', rec.table_name, rec.column_name);
-    END LOOP;
-END $$;
-Insertar Datos Esenciales: Ejecuta el script SQL que te proporcioné para insertar los permisos, roles y datos maestros básicos (monedas, tipos de comprobante, etc.).
-
-Backend
-Navega a la carpeta backend: cd backend
-
-Instala las dependencias: npm install
-
-Crea un archivo .env en la raíz de /backend y añade tus variables de entorno. Puedes usar este ejemplo:
-
-Fragmento de código
-
-PORT=4000
-DB_USER=postgres
-DB_HOST=localhost
-DB_DATABASE=bd_erp
-DB_PASSWORD=tu_contraseña_de_postgres
-DB_PORT=5432
-JWT_SECRET=tu_secreto_muy_seguro_para_jwt
-Inicia el servidor de desarrollo: npm run dev
-El servidor estará corriendo en http://localhost:4000.
-
-Frontend
-Abre una nueva terminal y navega a la carpeta frontend: cd frontend
-
-Instala las dependencias: npm install
-
-Inicia el cliente de desarrollo: npm run dev
-La aplicación estará disponible en http://localhost:5173.
+3️⃣ Frontend
+```bash
+Copiar
+Editar
+cd frontend
+npm install
+npm run dev
+```
+Frontend disponible en: http://localhost:5173
+### 📂 Estructura del Proyecto
+```bash
+/
+├── backend/
+│   ├── src/
+│   │   ├── controllers/   # Lógica de peticiones HTTP
+│   │   ├── middleware/    # Autenticación, autorización
+│   │   ├── routes/        # Definición de endpoints de la API
+│   │   └── services/      # Lógica de negocio y consultas a la BD
+├── frontend/
+│   ├── src/
+│   │   ├── components/    # Componentes reutilizables
+│   │   ├── hooks/         # Hooks personalizados
+│   │   ├── pages/         # Páginas/módulos
+│   │   ├── services/      # Llamadas a la API
+└── README.md
+```
