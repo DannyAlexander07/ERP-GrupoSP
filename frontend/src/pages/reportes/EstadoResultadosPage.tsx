@@ -1,4 +1,4 @@
-//frontend/src/pages/reportes/EstadoResultadosPage.tsx
+//Archivo: frontend/src/pages/reportes/EstadoResultadosPage.tsx
 import { useState } from 'react';
 import { fetchEstadoResultados, type EstadoResultados } from '../../services/reporteContableService';
 import { showErrorAlert } from '../../services/notificationService';

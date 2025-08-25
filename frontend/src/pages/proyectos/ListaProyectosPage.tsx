@@ -139,49 +139,61 @@ const ListaProyectosPage = () => {
     };
 
     // Cargar datos iniciales (clientes, usuarios, monedas, centros de costo)
-    useEffect(() => {
+     useEffect(() => {
         const loadInitialData = async () => {
             try {
-                const clientesData = await fetchClientes(1, 1000, {});
+                // Hacemos las llamadas a todas las APIs en paralelo
+                const [
+                    clientesData, 
+                    usuariosData, 
+                    monedasData,      // <-- Aseguramos que se llame a la API de monedas
+                    centrosCostoData
+                ] = await Promise.all([
+                    fetchClientes(1, 1000, {}),
+                    fetchUsersLocal(1, 1000, {}),
+                    fetchAllMonedas(), // <-- Aseguramos que se llame a la API de monedas
+                    fetchCentrosCosto(1, 1000, {})
+                ]);
+
+                // Guardamos los resultados en los estados correspondientes
                 setClientes(clientesData.records);
-                const usuariosData = await fetchUsersLocal(1, 1000, {}); // ¡CAMBIO AQUÍ! Usar fetchUsersLocal
                 setUsuarios(usuariosData.records);
-                const monedasData = await fetchAllMonedas(); 
-                setMonedas(monedasData);
-                const centrosCostoData = await fetchCentrosCosto(1, 1000, {}); 
+                setMonedas(monedasData); // <-- Guardamos las monedas en el estado
                 setCentrosCosto(centrosCostoData.records);
 
                 // Ajustar initialFormData con datos cargados si existen
                 setFormData(prev => {
                     const updatedData = { ...prev };
-                    if (clientesData.records.length > 0 && prev.cliente_id === undefined) {
+                    if (clientesData.records.length > 0 && !prev.cliente_id) {
                         updatedData.cliente_id = clientesData.records[0].cliente_id;
                     }
-                    if (usuariosData.records.length > 0 && prev.usuario_id_responsable_proyecto === undefined) {
+                    if (usuariosData.records.length > 0 && !prev.usuario_id_responsable_proyecto) {
                         updatedData.usuario_id_responsable_proyecto = usuariosData.records[0].usuario_id;
                     }
-                    if (monedasData.length > 0 && prev.moneda_id_presupuesto === undefined) {
+                    // ¡Importante! Asignamos una moneda por defecto si hay alguna
+                    if (monedasData.length > 0 && !prev.moneda_id_presupuesto) {
                         updatedData.moneda_id_presupuesto = monedasData[0].moneda_id;
                     }
-                    if (centrosCostoData.records.length > 0 && prev.centro_costo_id_asociado === undefined) {
+                    if (centrosCostoData.records.length > 0 && !prev.centro_costo_id_asociado) {
                         updatedData.centro_costo_id_asociado = centrosCostoData.records[0].centro_costo_id;
                     }
                     return updatedData;
                 });
 
-                if (clientesData.records.length === 0) showErrorAlert('Advertencia: No hay clientes registrados.');
-                if (usuariosData.records.length === 0) console.warn('Advertencia: No hay usuarios registrados para asignar como responsables.');
-                if (monedasData.length === 0) showErrorAlert('Advertencia: No hay monedas registradas.');
-                if (centrosCostoData.records.length === 0) console.warn('Advertencia: No hay centros de costo registrados.');
+                // Mostramos la advertencia solo si, después de la llamada, la lista sigue vacía
+                if (monedasData.length === 0) {
+                    showErrorAlert('Advertencia: No hay monedas registradas en el sistema.');
+                }
 
             } catch (error) {
                 if (error instanceof Error) showErrorAlert(`Error al cargar datos iniciales: ${error.message}`);
             } finally {
-                setLoading(false);
+                // Esto se ejecuta sin importar si hubo error o no
             }
         };
+        
         loadInitialData();
-    }, []);
+    }, []); 
 
     const loadProyectos = useCallback(async () => {
         try {

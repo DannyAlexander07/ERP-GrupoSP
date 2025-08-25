@@ -1,5 +1,5 @@
 // Archivo: frontend/src/pages/ventas/NuevaVentaPage.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react'; // <-- Se añade useMemo aquí
 import { useNavigate } from 'react-router-dom';
 import { 
     createFacturaVenta, 
@@ -20,12 +20,13 @@ const NuevaVentaPage = () => {
     // Datos para selects
     const [clientes, setClientes] = useState<Cliente[]>([]);
     const [servicios, setServicios] = useState<Servicio[]>([]);
-    const tiposComprobanteVenta = [
+    const tiposComprobanteVenta = useMemo(() => [
         { id: 1, codigo: '01', descripcion: 'Factura', abreviatura: 'F' },
         { id: 2, codigo: '03', descripcion: 'Boleta', abreviatura: 'B' },
         { id: 3, codigo: '07', descripcion: 'Nota de Crédito', abreviatura: 'NC' },
         { id: 4, codigo: '08', descripcion: 'Nota de Débito', abreviatura: 'ND' },
-    ];
+    ], []);
+
     const monedas = [
         { id: 1, codigo: 'PEN', nombre: 'Soles Peruanos', simbolo: 'S/' },
         { id: 2, codigo: 'USD', nombre: 'Dólares Americanos', simbolo: '$' },
@@ -83,7 +84,10 @@ const NuevaVentaPage = () => {
         if (!formData.moneda_id) errors.moneda_id = "La moneda es obligatoria.";
         if (formData.monto_total_factura === undefined || formData.monto_total_factura <= 0) errors.monto_total_factura = "El monto total debe ser mayor a 0.";
         if (!formData.detalles || formData.detalles.length === 0) errors.detalles = "Debe añadir al menos un detalle a la factura.";
-
+        if (!formData.serie_comprobante?.trim()) errors.serie_comprobante = "La serie es obligatoria.";
+        if (formData.numero_correlativo_comprobante === undefined || formData.numero_correlativo_comprobante <= 0) {
+            errors.numero_correlativo_comprobante = "El número debe ser mayor a 0.";
+        }
         // Validar detalles
         (formData.detalles as DetalleFacturaVenta[] || []).forEach((detalle, index) => {
             if (!detalle.servicio_id) errors[`detalle_servicio_id_${index}`] = `El servicio en la línea ${index + 1} es obligatorio.`;
@@ -97,17 +101,24 @@ const NuevaVentaPage = () => {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
-        let inputValue: string | number | boolean | undefined = value;
+        let finalValue: string | number | boolean | undefined | null = value;
 
         if (type === 'checkbox') {
-            inputValue = (e.target as HTMLInputElement).checked;
-        } else if (name.includes('monto') || name.includes('subtotal') || name.includes('porcentaje') || name.includes('tipo_cambio') || name.includes('cantidad') || name.includes('valor_unitario')) {
-            inputValue = value === '' ? undefined : Number(value);
-        } else if (name.includes('_id')) {
-            inputValue = Number(value);
+         finalValue = (e.target as HTMLInputElement).checked;
+        } else if (
+        // Unificamos todas las comprobaciones de campos numéricos en una sola condición
+            name.includes('_id') || 
+            name.includes('monto') || 
+            name.includes('subtotal') || 
+            name.includes('porcentaje') || 
+            name.includes('tipo_cambio') || 
+            name.includes('cantidad') ||    
+            name.includes('valor_unitario')
+        ) {
+         // Si el campo está vacío, lo tratamos como nulo/indefinido, si no, lo convertimos a número.
+        finalValue = value === '' ? null : Number(value);
         }
-        
-        setFormData(prev => ({ ...prev, [name]: inputValue }));
+        setFormData(prev => ({ ...prev, [name]: finalValue }));
     };
 
     const handleDetalleChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -241,27 +252,64 @@ const NuevaVentaPage = () => {
     };
 
     useEffect(() => {
+        const tipoSeleccionado = tiposComprobanteVenta.find(t => t.id === formData.tipo_comprobante_venta_id);
+        if (tipoSeleccionado) {
+            let nuevaSerie = '';
+            if (tipoSeleccionado.abreviatura === 'F') nuevaSerie = 'F001';
+            if (tipoSeleccionado.abreviatura === 'B') nuevaSerie = 'B001';
+            if (tipoSeleccionado.abreviatura === 'NC') nuevaSerie = 'NC01';
+            if (tipoSeleccionado.abreviatura === 'ND') nuevaSerie = 'ND01';
+            setFormData(prev => ({ ...prev, serie_comprobante: nuevaSerie }));
+        }
+    }, [formData.tipo_comprobante_venta_id, tiposComprobanteVenta]);
+
+    useEffect(() => {
         recalculateTotals(formData.detalles || []);
     }, [formData.detalles]);
 
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        
-        const errors = validateForm();
-        if (Object.keys(errors).length > 0) {
-            showValidationErrorAlert(errors);
-            return;
-        }
+    // Reemplaza esta función completa en NuevaVentaPage.tsx
+const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+        showValidationErrorAlert(errors);
+        return;
+    }
 
-        try {
-            await createFacturaVenta(formData as FacturaVenta);
-            showSuccessToast('¡Factura de venta creada con éxito!');
-            navigate('/ventas'); // Redirigir a la lista de facturas después de crear
-        } catch (error) {
-            if (error instanceof Error) showErrorAlert(error.message);
+    try {
+        // --- LÓGICA DE SEPARACIÓN (SE MANTIENE IGUAL) ---
+        const [serie, correlativoStr] = (formData.numero_completo_comprobante || '').split('-');
+        const correlativo = parseInt(correlativoStr, 10);
+
+        if (!serie || isNaN(correlativo)) {
+            showErrorAlert('El formato del Nro. de Comprobante es inválido. Debe ser SERIE-NUMERO, por ejemplo: F001-12345.');
+            return; 
         }
-    };
+        
+        // --- ¡CORRECCIÓN CLAVE AQUÍ! ---
+        // Construimos el objeto final para la API
+        const dataToSend = {
+            ...formData, // Copiamos todos los datos del formulario
+            serie_comprobante: serie.trim(), // Añadimos la serie
+            numero_correlativo_comprobante: correlativo, // Añadimos el correlativo numérico
+        };
+        // Opcional pero recomendado: eliminamos el campo combinado que ya no se usa en el backend
+        delete (dataToSend as Partial<FacturaVenta>).numero_completo_comprobante;
+
+        console.log("Datos que se enviarán a la API:", dataToSend); 
+
+        // ¡Enviamos 'dataToSend' en lugar de 'formData'!
+        await createFacturaVenta(dataToSend as FacturaVenta);
+
+        showSuccessToast('¡Factura de venta creada con éxito!');
+        navigate('/ventas');
+
+    } catch (error) {
+        if (error instanceof Error) showErrorAlert(error.message);
+    }
+};
 
     if (loading) return <div className="loading-spinner">Cargando...</div>;
 
@@ -274,8 +322,14 @@ const NuevaVentaPage = () => {
                 <div className="form-grid">
                     {/* Datos de Cabecera */}
                     <div className="form-group floating-label">
-                        <input id="numero_completo_comprobante" type="text" name="numero_completo_comprobante" value={'AUTOGENERADO'} disabled={true} placeholder=" " />
-                        <label htmlFor="numero_completo_comprobante">Nro. Comprobante</label>
+                        <input id="serie_comprobante" type="text" name="serie_comprobante" value={formData.serie_comprobante || ''} onChange={handleChange} placeholder=" " required />
+                        <label htmlFor="serie_comprobante">Serie</label>
+                        {formErrors.serie_comprobante && <span className="error-text">{formErrors.serie_comprobante}</span>}
+                    </div>
+                    <div className="form-group floating-label">
+                        <input id="numero_correlativo_comprobante" type="number" name="numero_correlativo_comprobante" value={formData.numero_correlativo_comprobante ?? ''} onChange={handleChange} placeholder=" " required />
+                        <label htmlFor="numero_correlativo_comprobante">Número</label>
+                        {formErrors.numero_correlativo_comprobante && <span className="error-text">{formErrors.numero_correlativo_comprobante}</span>}
                     </div>
                     <div className="form-group floating-label">
                         <select id="tipo_comprobante_venta_id" name="tipo_comprobante_venta_id" value={formData.tipo_comprobante_venta_id || ''} onChange={handleChange}>

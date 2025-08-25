@@ -10,7 +10,8 @@ import {
     downloadFacturaVentaXml,
     downloadFacturaVentaCdr,
     downloadFacturaVentaPdf,
-    aplicarSaldoAFactura
+    aplicarSaldoAFactura,
+    enviarFacturaASunat
 } from '../controllers/venta.controller';
 import { verifyToken } from '../middleware/auth.middleware';
 
@@ -26,6 +27,7 @@ router.get('/:id', getFacturaVenta); // Obtener una factura por ID
 router.put('/:id', updateFacturaVenta); // Actualizar una factura
 router.delete('/:id', deleteFacturaVenta); // Anular (eliminación lógica) una factura
 router.post('/:id/aplicar-saldo', verifyToken, aplicarSaldoAFactura);
+router.post('/:id/enviar-sunat', enviarFacturaASunat);
 
 // Rutas de exportación y descarga de comprobantes
 router.get('/export/excel', exportarFacturasVenta); // Exportar a Excel

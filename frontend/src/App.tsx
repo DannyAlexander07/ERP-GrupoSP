@@ -23,17 +23,18 @@ import ListaPrestamosPage from './pages/prestamos/ListaPrestamosPage';
 import NuevoPrestamoPage from './pages/prestamos/NuevoPrestamoPage';
 import ListaUsuariosPage from './pages/configuracion/ListaUsuariosPage';
 import ListaEmpresasPage from './pages/configuracion/ListaEmpresasPage';
-
-// --- ¡NUEVA PÁGINA DE REPORTES! ---
 import LibrosElectronicosPage from './pages/reportes/LibrosElectronicosPage';
 import EstadoResultadosPage from './pages/reportes/EstadoResultadosPage';
 import BalanceGeneralPage from './pages/reportes/BalanceGeneralPage'; 
+
+// --- ¡NUEVA IMPORTACIÓN! ---
+import ListaCentrosCostoPage from './pages/maestros/ListaCentrosCostoPage';
 
 function App() {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return <div className="loading-spinner">Cargando...</div>; // Muestra un loader mientras se valida el token
+    return <div className="loading-spinner">Cargando...</div>;
   }
 
   return (
@@ -41,7 +42,6 @@ function App() {
       <Routes>
         <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" /> : <LoginPage />} />
         
-        {/* --- Rutas Protegidas --- */}
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<DashboardPage />} />
 
@@ -75,6 +75,7 @@ function App() {
           <Route path="/clientes" element={<ListaClientesPage />} />
           <Route path="/proveedores" element={<ListaProveedoresPage />} />
           <Route path="/servicios" element={<ListaServiciosPage />} />
+          <Route path="/centros-costo" element={<ListaCentrosCostoPage />} /> 
 
           {/* Reportes */}
           <Route path="/reportes" element={<Navigate to="/reportes/libros-electronicos" />} />
@@ -88,7 +89,6 @@ function App() {
           <Route path="/configuracion/empresas" element={<ListaEmpresasPage />} />
         </Route>
 
-        {/* Redirección por defecto */}
         <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} />
       </Routes>
     </Router>

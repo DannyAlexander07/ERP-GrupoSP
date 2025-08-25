@@ -1,5 +1,7 @@
-// Archivo: backend/src/services/venta.service.ts (VERSIÓN FINAL Y COMPLETA CON IMPLEMENTACIÓN MOCK)
+// Archivo: backend/src/services/venta.service.ts 
 import pool from '../config/database';
+import QRCode from 'qrcode';
+import path from 'path';
 import { logAuditoria } from './auditoria.service';
 import type { Servicio } from './servicio.service';
 import type { Cliente } from './cliente.service';
@@ -33,6 +35,8 @@ export interface DetalleFacturaVenta {
     monto_total_linea_item: number;
     tipo_afectacion_impuesto_principal?: string;
     centro_costo_id?: number;
+    servicio_codigo?: string; // <-- La propiedad que faltaba
+    servicio_nombre?: string;
 }
 
 // Interfaz para la Factura de Venta (Cabecera) (debe coincidir con el backend)
@@ -67,6 +71,7 @@ export interface FacturaVenta {
     usuario_anulacion_id?: number;
     motivo_anulacion?: string;
     comprobante_referencia_id?: number; 
+    codigo_hash?: string | null;
 
     creado_por?: string;
     fecha_creacion?: string;
@@ -240,7 +245,7 @@ export const getFacturaVentaById = async (facturaId: number, empresaId: number):
         SELECT 
             dfv.*,
             s.nombre_servicio as servicio_nombre,
-            s.codigo_servicio_interno as servicio_codigo
+            s.codigo_servicio_interno as servicio_codigo 
         FROM detallesfacturaventa dfv
         JOIN servicios s ON dfv.servicio_id = s.servicio_id
         WHERE dfv.factura_venta_id = $1
@@ -268,7 +273,9 @@ export const createFacturaVenta = async (factura: FacturaVenta, usuarioId: numbe
         await client.query('BEGIN'); 
 
         const {
-            empresa_id_emisora, cliente_id, tipo_comprobante_venta_id, serie_comprobante,
+            empresa_id_emisora, cliente_id, tipo_comprobante_venta_id, 
+            serie_comprobante, // <-- VOLVEMOS A USAR ESTE
+            numero_correlativo_comprobante, // <-- VOLVEMOS A USAR ESTE
             fecha_emision, fecha_vencimiento, moneda_id, tipo_cambio_aplicado,
             condicion_pago_id, subtotal_afecto_impuestos, subtotal_inafecto_impuestos,
             subtotal_exonerado_impuestos, monto_descuento_global, monto_impuesto_principal,
@@ -277,12 +284,11 @@ export const createFacturaVenta = async (factura: FacturaVenta, usuarioId: numbe
             detalles 
         } = factura;
 
-        const nextCorrelativo = await getNextCorrelativoComprobante(empresa_id_emisora!, tipo_comprobante_venta_id, serie_comprobante);
-
         const insertFacturaQuery = `
             INSERT INTO public.facturasventa (
-                empresa_id_emisora, cliente_id, tipo_comprobante_venta_id, serie_comprobante,
-                numero_correlativo_comprobante, fecha_emision, fecha_vencimiento, moneda_id, tipo_cambio_aplicado,
+                empresa_id_emisora, cliente_id, tipo_comprobante_venta_id, 
+                serie_comprobante, numero_correlativo_comprobante, -- <-- VOLVEMOS A INSERTAR LAS PARTES
+                fecha_emision, fecha_vencimiento, moneda_id, tipo_cambio_aplicado,
                 condicion_pago_id, subtotal_afecto_impuestos, subtotal_inafecto_impuestos,
                 subtotal_exonerado_impuestos, monto_descuento_global, monto_impuesto_principal,
                 monto_otros_tributos, monto_total_factura, estado_factura, orden_compra_cliente_referencia,
@@ -292,8 +298,10 @@ export const createFacturaVenta = async (factura: FacturaVenta, usuarioId: numbe
         `;
 
         const facturaResult = await client.query(insertFacturaQuery, [
-            empresa_id_emisora, cliente_id, tipo_comprobante_venta_id, serie_comprobante,
-            nextCorrelativo, fecha_emision, fecha_vencimiento || null,
+            empresa_id_emisora, cliente_id, tipo_comprobante_venta_id, 
+            serie_comprobante, // <-- PASAMOS LA SERIE
+            numero_correlativo_comprobante, // <-- PASAMOS EL NÚMERO
+            fecha_emision, fecha_vencimiento || null,
             moneda_id, tipo_cambio_aplicado || 1.0000, condicion_pago_id || null, subtotal_afecto_impuestos || 0,
             subtotal_inafecto_impuestos || 0, subtotal_exonerado_impuestos || 0, monto_descuento_global || 0, monto_impuesto_principal || 0,
             monto_otros_tributos || 0, monto_total_factura, orden_compra_cliente_referencia || null,
@@ -622,69 +630,326 @@ export const getAllFacturasVentaForExport = async (empresaId: number, filters: V
     return result.rows;
 };
 
+
+
 // ... Funciones para descargar XML, CDR, PDF (RENOMBRADO y CORREGIDO)
 export const generateFacturaVentaXml = async (facturaId: number, empresaId: number): Promise<Buffer> => {
-    const xmlMock = `<factura><id>${facturaId}</id><empresa>${empresaId}</empresa></factura>`;
-    return Buffer.from(xmlMock, 'utf-8');
-};
-
-export const generateFacturaVentaCdr = async (facturaId: number, empresaId: number): Promise<Buffer> => {
-    // Simula un archivo zip vacío o de prueba
-    const cdrMock = 'Mock CDR content';
-    return Buffer.from(cdrMock, 'utf-8');
-};
-
-export const generateFacturaVentaPdf = async (facturaId: number, empresaId: number): Promise<Buffer> => {
-    const factura = await getFacturaVentaById(facturaId, empresaId);
-    if (!factura) {
-        throw new Error('Factura no encontrada');
+    // 1. Obtener todos los datos necesarios (esta parte no cambia)
+    const facturaData = await getFacturaVentaById(facturaId, empresaId);
+    if (!facturaData) {
+        throw new Error('Factura no encontrada para generar XML.');
     }
+    // ... (las demás consultas a empresa y cliente se mantienen igual)
+    const empresaQuery = await pool.query('SELECT * FROM Empresas WHERE empresa_id = $1', [empresaId]);
+    const emisor = empresaQuery.rows[0];
+    const clienteQuery = await pool.query('SELECT * FROM Clientes WHERE cliente_id = $1', [facturaData.cliente_id]);
+    const receptor = clienteQuery.rows[0];
 
-    // --- CORRECCIÓN: Asegurarse de que los datos numéricos sean tratados como números ---
-    // El objeto 'factura' puede traer montos como strings desde la base de datos.
-    const montoTotalNumerico = parseFloat(factura.monto_total_factura as any);
 
-    const doc = new PDFDocument({ margin: 40 });
-    const buffers: Buffer[] = [];
+    // 2. Construir el XML con las correcciones de tipo
+    const root = create({ version: '1.0', encoding: 'UTF-8' })
+      .ele('Invoice', {
+        'xmlns': 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2',
+        'xmlns:cac': 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2',
+        'xmlns:cbc': 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2',
+        'xmlns:ext': 'urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2'
+      })
+        .ele('ext:UBLExtensions')
+          .ele('ext:UBLExtension')
+            .ele('ext:ExtensionContent')
+              .ele('ds:Signature', { Id: 'SignatureSP' }).up()
+            .up()
+          .up()
+        .up()
+        .ele('cbc:UBLVersionID').txt('2.1').up()
+        .ele('cbc:CustomizationID').txt('2.0').up()
+        .ele('cbc:ID').txt(facturaData.numero_completo_comprobante || '').up() // <-- CORRECCIÓN: Añadir fallback para undefined
+        .ele('cbc:IssueDate').txt(new Date(facturaData.fecha_emision).toISOString().split('T')[0]).up()
+        .ele('cbc:InvoiceTypeCode', { listID: '0101' }).txt('01').up()
+        .ele('cbc:Note', { languageLocaleID: '1000' }).txt('CIENTO CINCUENTA SOLES CON 00/100').up()
+        .ele('cbc:DocumentCurrencyCode').txt(facturaData.moneda_nombre === 'Soles Peruanos' ? 'PEN' : 'USD').up()
+        
+        .ele('cac:Signature')
+          .ele('cbc:ID').txt(emisor.numero_identificacion_fiscal || '').up() // <-- CORRECCIÓN: Añadir fallback
+          .ele('cac:SignatoryParty')
+            .ele('cac:PartyIdentification').ele('cbc:ID').txt(emisor.numero_identificacion_fiscal || '').up().up() // <-- CORRECCIÓN: Añadir fallback
+            .ele('cac:PartyName').ele('cbc:Name').txt(emisor.nombre_empresa || '').up().up() // <-- CORRECCIÓN: Añadir fallback
+          .up()
+          .ele('cac:DigitalSignatureAttachment').ele('cac:ExternalReference').ele('cbc:URI').txt(`#SignatureSP`).up().up().up()
+        .up()
 
-    doc.on('data', buffers.push.bind(buffers));
-    
-    // Aquí va tu plantilla PDF
-    doc.fontSize(16).text(`Factura N° ${factura.numero_completo_comprobante}`, { align: 'center' });
-    doc.moveDown();
+        .ele('cac:AccountingSupplierParty')
+          .ele('cac:Party')
+            .ele('cac:PartyIdentification').ele('cbc:ID', { schemeID: '6' }).txt(emisor.numero_identificacion_fiscal || '').up().up() // <-- CORRECCIÓN: Añadir fallback
+            .ele('cac:PartyName').ele('cbc:Name').txt(emisor.nombre_comercial || emisor.nombre_empresa || '').up().up() // <-- CORRECCIÓN: Añadir fallback
+            .ele('cac:PartyLegalEntity').ele('cbc:RegistrationName').txt(emisor.nombre_empresa || '').up().up() // <-- CORRECCIÓN: Añadir fallback
+          .up()
+        .up()
 
-    doc.fontSize(12).text(`Cliente: ${factura.cliente_razon_social}`);
-    doc.text(`Fecha de emisión: ${new Date(factura.fecha_emision).toLocaleDateString('es-PE')}`); // Formatear fecha
-    doc.text(`Moneda: ${factura.moneda_nombre}`);
-    
-    // --- ¡CORRECCIÓN AQUÍ! Usamos la variable numérica ---
-    doc.text(`Monto total: ${montoTotalNumerico.toFixed(2)}`);
+        .ele('cac:AccountingCustomerParty')
+          .ele('cac:Party')
+            .ele('cac:PartyIdentification').ele('cbc:ID', { schemeID: receptor.tipo_documento_identidad === 'RUC' ? '6' : '1' }).txt(receptor.numero_documento_identidad || '').up().up() // <-- CORRECCIÓN: Añadir fallback
+            .ele('cac:PartyLegalEntity').ele('cbc:RegistrationName').txt(receptor.razon_social_o_nombres || '').up().up() // <-- CORRECCIÓN: Añadir fallback
+          .up()
+        .up()
 
-    doc.moveDown().text('Detalles:', { underline: true });
-    
-    factura.detalles?.forEach((item) => {
-        // --- ¡CORRECCIÓN AQUÍ! También convertimos el total de la línea a número ---
-        const montoTotalItemNumerico = parseFloat(item.monto_total_linea_item as any);
-        doc.text(`- ${item.descripcion_item_servicio_factura} (x${item.cantidad}) = S/ ${montoTotalItemNumerico.toFixed(2)}`);
+        // ... (Los totales con .toFixed(2) ya devuelven un string, así que están bien)
+        .ele('cac:TaxTotal')
+          .ele('cbc:TaxAmount', { currencyID: 'PEN' }).txt(Number(facturaData.monto_impuesto_principal).toFixed(2)).up()
+          // ...
+        .up()
+        .ele('cac:LegalMonetaryTotal')
+            .ele('cbc:LineExtensionAmount', { currencyID: 'PEN' }).txt(Number(facturaData.subtotal_afecto_impuestos).toFixed(2)).up()
+            .ele('cbc:TaxInclusiveAmount', { currencyID: 'PEN' }).txt(Number(facturaData.monto_total_factura).toFixed(2)).up()
+            .ele('cbc:PayableAmount', { currencyID: 'PEN' }).txt(Number(facturaData.monto_total_factura).toFixed(2)).up()
+        .up();
+
+    facturaData.detalles?.forEach((item, index) => {
+        root.ele('cac:InvoiceLine')
+            .ele('cbc:ID').txt((index + 1).toString()).up() // <-- CORRECCIÓN: Convertir número a string
+            .ele('cbc:InvoicedQuantity', { unitCode: 'NIU' }).txt(item.cantidad.toString()).up() // <-- CORRECCIÓN: Convertir número a string
+            .ele('cbc:LineExtensionAmount', { currencyID: 'PEN' }).txt(Number(item.subtotal_linea_sin_impuestos).toFixed(2)).up()
+            .ele('cac:PricingReference')
+              .ele('cac:AlternativeConditionPrice')
+                .ele('cbc:PriceAmount', { currencyID: 'PEN' }).txt(Number(item.precio_unitario_con_impuestos).toFixed(2)).up()
+                .ele('cbc:PriceTypeCode').txt('01').up()
+              .up()
+            .up()
+            .ele('cac:TaxTotal')
+              .ele('cbc:TaxAmount', { currencyID: 'PEN' }).txt(Number(item.monto_impuesto_principal_item).toFixed(2)).up()
+            .up()
+            .ele('cac:Item')
+              .ele('cbc:Description').txt(item.descripcion_item_servicio_factura || '').up() // <-- CORRECCIÓN: Añadir fallback
+            .up()
+            .ele('cac:Price')
+              .ele('cbc:PriceAmount', { currencyID: 'PEN' }).txt(Number(item.valor_unitario_sin_impuestos).toFixed(2)).up()
+            .up()
+        .up();
     });
 
-    doc.end();
+    const xmlString = root.end({ prettyPrint: true });
+    return Buffer.from(xmlString, 'utf-8');
+};
 
+export const getFacturaVentaCdr = async (facturaId: number, empresaId: number): Promise<Buffer | null> => {
+    // 1. Buscamos en la base de datos si ya existe un CDR para esta factura.
+    const result = await pool.query(
+        'SELECT archivo_cdr FROM facturasventa WHERE factura_venta_id = $1 AND empresa_id_emisora = $2',
+        [facturaId, empresaId]
+    );
+
+    if (result.rows.length > 0 && result.rows[0].archivo_cdr) {
+        // 2. Si la columna tiene datos (el Buffer del ZIP), lo devolvemos.
+        return result.rows[0].archivo_cdr;
+    } else {
+        // 3. Si no hay CDR guardado, devolvemos null para que el controlador indique un error 404 (No Encontrado).
+        return null;
+    }
+};
+
+// Generar PDF de la factura de venta (RENOMBRADO y CORREGIDO)
+export const generateFacturaVentaPdf = async (facturaId: number, empresaId: number): Promise<Buffer> => {
+    // 1. Obtener los datos completos de la factura (incluyendo el nuevo campo codigo_hash)
+    const factura = await getFacturaVentaById(facturaId, empresaId);
+    if (!factura) throw new Error('Factura no encontrada');
+
+    const empresaQuery = await pool.query('SELECT * FROM Empresas WHERE empresa_id = $1', [empresaId]);
+    const emisor = empresaQuery.rows[0];
+
+    const clienteQuery = await pool.query('SELECT * FROM Clientes WHERE cliente_id = $1', [factura.cliente_id]);
+    const receptor = clienteQuery.rows[0];
+
+    // 2. Construir la cadena de texto para el Código QR
+    // El formato oficial de SUNAT es: RUC|TIPO|SERIE|NUMERO|IGV|TOTAL|FECHA|TIPO_DOC_CLIENTE|NRO_DOC_CLIENTE|HASH
+    const tipoComprobanteQuery = await pool.query('SELECT codigo_fiscal FROM tiposcomprobanteventa WHERE tipo_comprobante_venta_id = $1', [factura.tipo_comprobante_venta_id]);
+    const tipoComprobanteCodigo = tipoComprobanteQuery.rows[0]?.codigo_fiscal || '01';
+    
+    const tipoDocClienteCodigo = receptor.tipo_documento_identidad === 'RUC' ? '6' : '1';
+
+    const hashFinal = factura.codigo_hash || 'PENDIENTE DE ENVÍO A SUNAT';
+
+    const qrDataString = [
+        emisor.numero_identificacion_fiscal,
+        tipoComprobanteCodigo,
+        factura.serie_comprobante,
+        factura.numero_correlativo_comprobante,
+        Number(factura.monto_impuesto_principal).toFixed(2),
+        Number(factura.monto_total_factura).toFixed(2),
+        new Date(factura.fecha_emision).toISOString().split('T')[0],
+        tipoDocClienteCodigo,
+        receptor.numero_documento_identidad,
+        hashFinal // Nota: El hash real se genera después de firmar el XML
+    ].join('|');
+
+    // 3. Generar la imagen del QR como un Data URL (formato de texto)
+    const qrCodeDataURL = await QRCode.toDataURL(qrDataString);
+
+    // 4. Construir el PDF
     return new Promise((resolve) => {
-        doc.on('end', () => {
-            const pdfBuffer = Buffer.concat(buffers);
-            resolve(pdfBuffer);
-        });
+        const doc = new PDFDocument({ size: 'A4', margin: 40 });
+        const buffers: Buffer[] = [];
+        doc.on('data', buffers.push.bind(buffers));
+        doc.on('end', () => resolve(Buffer.concat(buffers)));
+
+        // Paleta de Colores
+        const colorPrincipal = '#2c3e50';
+        const colorSecundario = '#34495e';
+        const colorGrisTexto = '#333333';
+        const colorGrisClaro = '#7f8c8d';
+        const colorBordeTabla = '#bdc3c7';
+
+        // Función de Ayuda para la Cabecera
+        const drawHeader = () => {
+            try {
+                const logoPath = path.join(__dirname, '../../public/images/logo.jpeg');
+                doc.image(logoPath, 40, 40, { width: 80 });
+            } catch (error) {
+                console.error("No se pudo cargar el logo.");
+            }
+
+            const textStartX = 140;
+            doc.fillColor(colorPrincipal).fontSize(16).font('Helvetica-Bold').text(emisor.nombre_empresa, textStartX, 45, { width: 220 });
+
+            const fullAddress = emisor.direccion_fiscal_completa || '';
+            const addressParts = fullAddress.split(',');
+            let addressLine1 = fullAddress;
+            let addressLine2 = '';
+            if (addressParts.length >= 2) {
+                addressLine1 = addressParts.slice(0, addressParts.length - 2).join(',');
+                addressLine2 = addressParts.slice(addressParts.length - 2).join(',').trim();
+            }
+
+            doc.fontSize(9).font('Helvetica').fillColor(colorGrisClaro)
+                .text(addressLine1, textStartX, doc.y, { width: 220 })
+                .text(addressLine2, textStartX, doc.y, { width: 220 })
+                .text(`Tel: ${emisor.telefono_contacto || ''}`, textStartX, doc.y)
+                .text(`RUC: ${emisor.numero_identificacion_fiscal}`, textStartX, doc.y);
+
+            const boxX = 380;
+            const boxY = 40;
+            const boxHeight = 40;
+            const tipoComprobanteTexto = `${(factura.tipo_comprobante_descripcion || 'COMPROBANTE').toUpperCase()}\nELECTRÓNICA`;
+            
+            doc.fillColor(colorPrincipal).rect(boxX, boxY, 170, 35).fill();
+            doc.fillColor('white').fontSize(11).font('Helvetica-Bold').text(tipoComprobanteTexto, boxX, boxY + 7, { align: 'center', width: 170 });
+            
+            const bottomOfBox = boxY + boxHeight;
+            doc.fillColor(colorGrisTexto).fontSize(11).font('Helvetica-Bold').text(`RUC: ${emisor.numero_identificacion_fiscal}`, boxX + 10, bottomOfBox + 5);
+            doc.text(`${factura.numero_completo_comprobante}`, boxX + 10, bottomOfBox + 20);
+        };
+
+        // Función de Ayuda para la Info del Cliente
+        const drawClientInfo = () => {
+            const yPos = Math.max(doc.y, 120) + 15;
+            doc.moveTo(40, yPos).lineTo(550, yPos).stroke(colorBordeTabla);
+            const clientInfoY = yPos + 15;
+            doc.fillColor(colorGrisClaro).fontSize(9).font('Helvetica-Bold').text('CLIENTE:', 40, clientInfoY);
+            doc.fillColor(colorGrisTexto).font('Helvetica')
+               .text(`${receptor.razon_social_o_nombres}`, 90, clientInfoY, { width: 280 })
+               .text(`DOCUMENTO: ${receptor.numero_documento_identidad}`, 90, doc.y)
+               .text(`DIRECCIÓN: ${receptor.direccion_fiscal_completa || 'N/A'}`, 90, doc.y, { width: 280 });
+            const emissionDateY = clientInfoY;
+            doc.fillColor(colorGrisClaro).font('Helvetica-Bold').text('Fecha Emisión:', 380, emissionDateY, {align: 'right', width: 90});
+            doc.fillColor(colorGrisTexto).font('Helvetica').text(new Date(factura.fecha_emision).toLocaleDateString('es-PE'), 470, emissionDateY, {align: 'right', width: 80});
+            if (factura.fecha_vencimiento) {
+                doc.fillColor(colorGrisClaro).font('Helvetica-Bold').text('Fecha Venc.:', 380, emissionDateY + 15, {align: 'right', width: 90});
+                doc.fillColor(colorGrisTexto).font('Helvetica').text(new Date(factura.fecha_vencimiento).toLocaleDateString('es-PE'), 470, emissionDateY + 15, {align: 'right', width: 80});
+            }
+            doc.moveTo(40, doc.y + 10).lineTo(550, doc.y + 10).stroke(colorBordeTabla);
+        };
+
+        // Función de Ayuda para la Tabla de Items
+        const drawInvoiceTable = () => {
+            const tableTop = doc.y + 20;
+            let y = tableTop;
+            const tableHeadersX = 40;
+            
+            doc.rect(40, y, 510, 25).fill(colorSecundario);
+            doc.fillColor('white').font('Helvetica-Bold').fontSize(10);
+            doc.text('CÓDIGO', tableHeadersX + 10, y + 8);
+            doc.text('DESCRIPCIÓN', tableHeadersX + 70, y + 8);
+            doc.text('CANT.', tableHeadersX + 310, y + 8, { width: 40, align: 'right' });
+            doc.text('V. UNIT.', tableHeadersX + 360, y + 8, { width: 60, align: 'right' });
+            doc.text('TOTAL', tableHeadersX + 430, y + 8, { width: 70, align: 'right' });
+            y += 25;
+
+            doc.font('Helvetica').fontSize(10).fillColor(colorGrisTexto);
+            
+            factura.detalles?.forEach((item, i) => {
+                const rowY = y + (i * 25);
+                doc.text(item.servicio_codigo || 'N/A', tableHeadersX + 10, rowY + 8, { width: 50 });
+                doc.text(item.descripcion_item_servicio_factura, tableHeadersX + 70, rowY + 8, { width: 240 });
+                doc.text(item.cantidad.toString(), tableHeadersX + 310, rowY + 8, { width: 40, align: 'right' });
+                doc.text(Number(item.valor_unitario_sin_impuestos).toFixed(2), tableHeadersX + 360, rowY + 8, { width: 60, align: 'right' });
+                doc.text(Number(item.monto_total_linea_item).toFixed(2), tableHeadersX + 430, rowY + 8, { width: 70, align: 'right' });
+                doc.moveTo(40, rowY + 25).lineTo(550, rowY + 25).stroke(colorBordeTabla);
+            });
+
+            y += (factura.detalles?.length || 0) * 25;
+            
+            const totalsY = y + 10;
+            const totalLabelX = 370;
+            const totalValueX = 460;
+            doc.font('Helvetica').text('Subtotal', totalLabelX, totalsY, { align: 'right', width: 80 });
+            doc.text(Number(factura.subtotal_afecto_impuestos).toFixed(2), totalValueX, totalsY, { align: 'right', width: 90 });
+            doc.text('IGV (18%)', totalLabelX, totalsY + 15, { align: 'right', width: 80 });
+            doc.text(Number(factura.monto_impuesto_principal).toFixed(2), totalValueX, totalsY + 15, { align: 'right', width: 90 });
+            doc.moveDown(1);
+            const finalTotalY = doc.y;
+            doc.font('Helvetica-Bold').fontSize(12);
+            doc.rect(totalLabelX - 20, finalTotalY - 5, 200, 25).fill(colorPrincipal);
+            doc.fillColor('#FFFFFF').text('TOTAL', totalLabelX, finalTotalY, { align: 'right', width: 80 });
+            doc.text(`${factura.moneda_nombre === 'Soles Peruanos' ? 'S/' : '$'} ${Number(factura.monto_total_factura).toFixed(2)}`, totalValueX, finalTotalY, { align: 'right', width: 90 });
+        };
+
+        // Función de Ayuda para el Pie de Página
+        const drawFooter = () => {
+            const yPos = 700;
+            doc.image(qrCodeDataURL, 40, yPos - 40, { width: 90 });
+            doc.fontSize(8).fillColor(colorGrisClaro)
+                .text('Representación impresa de la Factura Electrónica.', 150, yPos)
+                .text('Consulte su documento en nuestro portal web.', 150, doc.y)
+                .text(`HASH: ${hashFinal}`, 150, doc.y, { // <-- Se usa el hash correcto
+                    // Añadimos estas opciones para que el hash largo no se desborde
+                    width: 400,
+                    lineBreak: true
+                });
+        };
+        
+        // --- Dibujar el documento ---
+        drawHeader();
+        drawClientInfo();
+        drawInvoiceTable();
+        drawFooter();
+        
+        doc.end();
     });
 };
 
 // NUEVA FUNCIÓN AUXILIAR (puedes ponerla al final del archivo)
 async function generarAsientoDeVenta(factura: FacturaVenta, client: any, usuarioId: number, nombreUsuario: string) {
-    // --- IMPORTANTE: Configuración de Cuentas Contables ---
-    // Reemplaza estos IDs con los correctos de tu Plan de Cuentas.
-    const CUENTA_CLIENTES_NACIONALES = 1; // Ej: ID de la cuenta "1212 Cuentas por Cobrar Comerciales"
-    const CUENTA_IGV_POR_PAGAR = 2;       // Ej: ID de la cuenta "4011 IGV por Pagar"
-    const CUENTA_VENTA_SERVICIOS = 3;    // Ej: ID de la cuenta "7041 Venta de Servicios"
+    // --- Configuración de Cuentas Contables (Asegúrate de que estos IDs sean correctos) ---
+    const CUENTA_CLIENTES_NACIONALES = 1;
+    const CUENTA_IGV_POR_PAGAR = 2;
+    const CUENTA_VENTA_SERVICIOS = 3;
+
+    // --- ¡INICIO DE LA MEJORA! Lógica para encontrar el período contable correcto ---
+    const fechaFactura = new Date(factura.fecha_emision);
+    // getMonth() es 0-11, por eso sumamos 1
+    const anioFactura = fechaFactura.getFullYear();
+    const mesFactura = fechaFactura.getMonth() + 1;
+
+    const periodoResult = await client.query(
+        'SELECT periodo_contable_id FROM public.periodoscontables WHERE anio_ejercicio = $1 AND mes_ejercicio = $2 AND empresa_id = $3',
+        [anioFactura, mesFactura, factura.empresa_id_emisora]
+    );
+
+    if (periodoResult.rows.length === 0) {
+        // Si no se encuentra el período, lanzamos un error claro.
+        throw new Error(`No se encontró un período contable abierto para la fecha ${factura.fecha_emision}. Por favor, créalo en la configuración del sistema.`);
+    }
+    const periodoId = periodoResult.rows[0].periodo_contable_id;
+
 
     const asientoDetalles: asientoContableService.AsientoContableDetalle[] = [
         {
@@ -799,4 +1064,42 @@ export const aplicarSaldoAFactura = async (facturaId: number, empresaId: number,
     } finally {
         client.release();
     }
+};
+
+export const firmarFacturaYEnviarASunat = async (facturaId: number, empresaId: number): Promise<{ exito: boolean; mensaje: string; hash: string }> => {
+    // 1. OBTENER LOS DATOS DE LA FACTURA
+    const factura = await getFacturaVentaById(facturaId, empresaId);
+    if (!factura) {
+        throw new Error('Factura no encontrada para firmar.');
+    }
+    console.log(`Paso 1: Obtenida información para la factura ${factura.numero_completo_comprobante}`);
+
+    // 2. SIMULAR EL PROCESO DE FIRMA DIGITAL
+    // En un caso real, aquí usarías tu certificado digital y una librería de firma.
+    const crypto = require('crypto');
+    const hashSimulado = crypto.createHash('sha256').update(new Date().toISOString()).digest('hex');
+    console.log(`Paso 2: Firma digital simulada. Hash generado: ${hashSimulado}`);
+    
+    // 3. SIMULAR EL ENVÍO A SUNAT Y RECEPCIÓN DEL CDR
+    console.log("Paso 3: Enviando a SUNAT (simulación)... ¡SUNAT aceptó!");
+    const cdrSimulado = Buffer.from("Este es un CDR de prueba en un ZIP simulado para la factura " + factura.numero_completo_comprobante);
+
+    // 4. GUARDAR LOS RESULTADOS EN LA BASE DE DATOS
+    await pool.query(
+        `UPDATE facturasventa 
+         SET 
+            codigo_hash = $1, 
+            estado_sunat = 'Aceptada',
+            archivo_cdr = $2,
+            estado_factura = 'Aceptada'
+         WHERE factura_venta_id = $3`,
+        [hashSimulado, cdrSimulado, facturaId]
+    );
+    console.log(`Paso 4: Base de datos actualizada para la factura ${facturaId}.`);
+
+    return {
+        exito: true,
+        mensaje: `Factura ${factura.numero_completo_comprobante} fue firmada y aceptada por SUNAT (simulación).`,
+        hash: hashSimulado
+    };
 };

@@ -1,3 +1,4 @@
+//Archivo: frontend/src/pages/reportes/BalanceGeneralPage.tsx
 import { useState } from 'react';
 import { fetchBalanceGeneral, type BalanceGeneral } from '../../services/reporteContableService';
 import { showErrorAlert } from '../../services/notificationService';

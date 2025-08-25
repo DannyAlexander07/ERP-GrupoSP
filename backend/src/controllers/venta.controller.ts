@@ -156,8 +156,12 @@ export const downloadFacturaVentaCdr = async (req: AuthenticatedRequest, res: Re
         const empresaId = req.user?.empresa_id;
         if (!empresaId) return res.status(400).json({ message: 'Usuario sin empresa asociada.' });
 
-        const cdrBuffer = await ventaService.generateFacturaVentaCdr(parseInt(id), empresaId);
-        if (!cdrBuffer) return res.status(404).json({ message: 'CDR no encontrado o no generado.' });
+        // CAMBIO: Llamar a la nueva función 'getFacturaVentaCdr'
+        const cdrBuffer = await ventaService.getFacturaVentaCdr(parseInt(id), empresaId);
+        
+        if (!cdrBuffer) {
+            return res.status(404).json({ message: 'El CDR para esta factura no ha sido encontrado. Probablemente aún no ha sido procesado por la SUNAT.' });
+        }
 
         const factura = await ventaService.getFacturaVentaById(parseInt(id), empresaId);
         const fileName = factura ? `R-${factura.numero_completo_comprobante}.zip` : `cdr_${id}.zip`; 
@@ -167,7 +171,7 @@ export const downloadFacturaVentaCdr = async (req: AuthenticatedRequest, res: Re
         res.send(cdrBuffer);
     } catch (error: any) {
         console.error("Error al descargar CDR de factura:", error);
-        res.status(500).json({ message: error.message || 'Error al generar el CDR.' });
+        res.status(500).json({ message: error.message || 'Error al obtener el CDR.' });
     }
 };
 
@@ -190,6 +194,23 @@ export const downloadFacturaVentaPdf = async (req: AuthenticatedRequest, res: Re
     } catch (error: any) {
         console.error("Error al descargar PDF de factura:", error);
         res.status(500).json({ message: error.message || 'Error al generar el PDF.' });
+    }
+};
+
+export const enviarFacturaASunat = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const empresaId = req.user?.empresa_id;
+        if (!empresaId) {
+            return res.status(400).json({ message: 'Usuario sin empresa asociada.' });
+        }
+
+        const resultado = await ventaService.firmarFacturaYEnviarASunat(parseInt(id), empresaId);
+
+        res.status(200).json(resultado);
+    } catch (error: any) {
+        console.error("Error en el proceso de envío a SUNAT:", error);
+        res.status(500).json({ message: error.message || 'Error interno del servidor.' });
     }
 };
 

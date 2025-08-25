@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+// Archivo: frontend/src/pages/proyectos/NuevoProyectoPage.tsx (VERSIÓN FINAL CORREGIDA)
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { 
     createProyecto, 
-    fetchNextProyectoCode, // <-- 1. IMPORTAMOS LA NUEVA FUNCIÓN
+    fetchNextProyectoCode,
     type Proyecto, 
 } from '../../services/proyectoService';
 import { fetchClientes, type Cliente } from '../../services/clienteService';
@@ -12,7 +13,7 @@ import { fetchCentrosCosto, type CentroCosto } from '../../services/centroCostoS
 import { showSuccessToast, showErrorAlert, showValidationErrorAlert } from '../../services/notificationService';
 import '../../styles/TablePage.css'; 
 
-// --- Interfaces (Replicadas para autonomía del componente) ---
+// --- Interfaces y Constantes Fuera del Componente ---
 interface FormErrors { [key: string]: string; }
 
 interface User { 
@@ -31,11 +32,13 @@ interface PagedUsersResponse {
     current_page: number;
 }
 
+const tiposProyecto = ['Diseño Web', 'Campaña Digital', 'Desarrollo Software', 'Consultoría', 'Otros'];
+const estadosProyecto = ['Planificado', 'En Curso', 'Completado', 'Pausado', 'Cancelado'];
 
 const NuevaProyectoPage = () => {
     const navigate = useNavigate();
 
-    // --- Estados del componente ---
+    // --- Estados del Componente ---
     const [clientes, setClientes] = useState<Cliente[]>([]);
     const [usuarios, setUsuarios] = useState<User[]>([]);
     const [monedas, setMonedas] = useState<Moneda[]>([]);
@@ -43,52 +46,39 @@ const NuevaProyectoPage = () => {
     const [formErrors, setFormErrors] = useState<FormErrors>({});
     const [loading, setLoading] = useState(true);
 
-    const tiposProyecto = ['Diseño Web', 'Campaña Digital', 'Desarrollo Software', 'Consultoría', 'Otros'];
-    const estadosProyecto = ['Planificado', 'En Curso', 'Completado', 'Pausado', 'Cancelado'];
-
-    const initialFormData: Partial<Proyecto> = {
+    const initialFormData: Partial<Proyecto> = useMemo(() => ({
         cliente_id: undefined,
         nombre_proyecto_campaña: '',
         codigo_proyecto_interno: '',
         descripcion_proyecto: '',
-        tipo_proyecto: tiposProyecto[0] || '',
+        tipo_proyecto: tiposProyecto[0],
         fecha_inicio_proyectada: new Date().toISOString().split('T')[0],
         fecha_fin_proyectada: '',
-        fecha_inicio_real: '',
-        fecha_fin_real: '',
-        moneda_id_presupuesto: undefined, 
+        moneda_id_presupuesto: undefined,
         monto_presupuestado_ingresos: 0,
         monto_presupuestado_costos: 0,
-        usuario_id_responsable_proyecto: undefined, 
-        estado_proyecto: estadosProyecto[0] || 'Planificado',
-        centro_costo_id_asociado: undefined, 
-    };
+        usuario_id_responsable_proyecto: undefined,
+        estado_proyecto: estadosProyecto[0],
+        centro_costo_id_asociado: undefined,
+    }), []);
+
     const [formData, setFormData] = useState<Partial<Proyecto>>(initialFormData);
 
-    // --- Función local para obtener usuarios ---
-    const fetchUsersLocal = async (page: number, limit: number): Promise<PagedUsersResponse> => {
-        try {
+    // --- Carga de Datos y Lógica ---
+    useEffect(() => {
+        const fetchUsersLocal = async (page: number, limit: number): Promise<PagedUsersResponse> => {
             const token = localStorage.getItem('user_token');
             const params = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
             const response = await axios.get('http://localhost:4000/api/auth/users', {
                 params,
                 headers: { Authorization: `Bearer ${token}` },
-            }); 
+            });
             return response.data;
-        } catch (error) { 
-            if (axios.isAxiosError(error) && error.response) { 
-                throw new Error(error.response.data.message || 'Error al obtener usuarios.');
-            }
-            throw new Error('No se pudo conectar con el servidor para obtener usuarios.');
-        }
-    };
+        };
 
-    // --- Carga de datos iniciales y el nuevo código ---
-    useEffect(() => {
         const loadInitialData = async () => {
             try {
                 setLoading(true);
-                // 2. Usamos Promise.all para cargar todo en paralelo
                 const [
                     clientesData, 
                     usuariosData, 
@@ -99,8 +89,8 @@ const NuevaProyectoPage = () => {
                     fetchClientes(1, 1000, {}),
                     fetchUsersLocal(1, 1000),
                     fetchAllMonedas(),
-                    fetchCentrosCosto(1, 1000, {}),
-                    fetchNextProyectoCode() // <-- Llamada a la nueva función
+                    fetchCentrosCosto(1, 9999, {}),
+                    fetchNextProyectoCode()
                 ]);
 
                 setClientes(clientesData.records);
@@ -108,16 +98,17 @@ const NuevaProyectoPage = () => {
                 setMonedas(monedasData);
                 setCentrosCosto(centrosCostoData.records);
 
-                // 3. Establecemos los valores por defecto en el formulario, incluyendo el CÓDIGO
                 setFormData(prev => ({
                     ...prev,
-                    codigo_proyecto_interno: nextCode, // <-- Asignamos el código
+                    codigo_proyecto_interno: nextCode,
                     cliente_id: prev.cliente_id || (clientesData.records.length > 0 ? clientesData.records[0].cliente_id : undefined),
                     usuario_id_responsable_proyecto: prev.usuario_id_responsable_proyecto || (usuariosData.records.length > 0 ? usuariosData.records[0].usuario_id : undefined),
                     moneda_id_presupuesto: prev.moneda_id_presupuesto || (monedasData.length > 0 ? monedasData[0].moneda_id : undefined),
+                    centro_costo_id_asociado: prev.centro_costo_id_asociado || (centrosCostoData.records.length > 0 ? centrosCostoData.records[0].centro_costo_id : undefined),
                 }));
 
                 if (clientesData.records.length === 0) showErrorAlert('Advertencia: No hay clientes registrados.');
+                if (centrosCostoData.records.length === 0) showErrorAlert('Advertencia: No hay Centros de Costo registrados.');
 
             } catch (error) {
                 if (error instanceof Error) showErrorAlert(`Error al cargar datos iniciales: ${error.message}`);
@@ -132,35 +123,27 @@ const NuevaProyectoPage = () => {
         const errors: FormErrors = {};
         if (!formData.cliente_id) errors.cliente_id = "El cliente es obligatorio.";
         if (!formData.nombre_proyecto_campaña?.trim()) errors.nombre_proyecto_campaña = "El nombre del proyecto es obligatorio.";
-        if (!formData.tipo_proyecto?.trim()) errors.tipo_proyecto = "El tipo de proyecto es obligatorio.";
-        if (!formData.fecha_inicio_proyectada) errors.fecha_inicio_proyectada = "La fecha de inicio proyectada es obligatoria.";
-        if (!formData.estado_proyecto?.trim()) errors.estado_proyecto = "El estado del proyecto es obligatorio.";
+        if (!formData.fecha_inicio_proyectada) errors.fecha_inicio_proyectada = "La fecha de inicio es obligatoria.";
         setFormErrors(errors);
         return errors;
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-        const { name, value, type } = e.target;
-        let inputValue: string | number | boolean | undefined = value;
-
-        if (type === 'checkbox') {
-            inputValue = (e.target as HTMLInputElement).checked;
-        } else if (name.includes('monto') || name.includes('_id')) { 
-            inputValue = value === '' ? undefined : Number(value); 
-        }
-        
-        setFormData(prev => ({ ...prev, [name]: inputValue }));
+        const { name, value } = e.target;
+        const isNumericField = name.includes('_id') || name.includes('monto');
+        setFormData(prev => ({
+            ...prev,
+            [name]: isNumericField && value !== '' ? Number(value) : value
+        }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
         const errors = validateForm();
         if (Object.keys(errors).length > 0) {
             showValidationErrorAlert(errors);
             return;
         }
-
         try {
             await createProyecto(formData as Proyecto);
             showSuccessToast('¡Proyecto creado con éxito!');
@@ -179,22 +162,15 @@ const NuevaProyectoPage = () => {
             </div>
             <form onSubmit={handleSubmit} className="modal-form" noValidate>
                 <div className="form-grid">
+                    {/* --- INICIO DEL FORMULARIO --- */}
                     <div className="form-group floating-label">
-                        <input 
-                            id="codigo_proyecto_interno" 
-                            type="text" 
-                            name="codigo_proyecto_interno" 
-                            value={formData.codigo_proyecto_interno || ''} 
-                            onChange={handleChange} 
-                            disabled={true} // <-- 4. CAMPO DESHABILITADO
-                            placeholder=" " 
-                        />
+                        <input id="codigo_proyecto_interno" type="text" name="codigo_proyecto_interno" value={formData.codigo_proyecto_interno || ''} disabled={true} placeholder=" " />
                         <label htmlFor="codigo_proyecto_interno">Código Interno</label>
                     </div>
 
                     <div className="form-group floating-label">
                         <input id="nombre_proyecto_campaña" type="text" name="nombre_proyecto_campaña" value={formData.nombre_proyecto_campaña || ''} onChange={handleChange} placeholder=" " required />
-                        <label htmlFor="nombre_proyecto_campaña">Nombre de Proyecto / Campaña</label>
+                        <label htmlFor="nombre_proyecto_campaña">Nombre de Proyecto</label>
                         {formErrors.nombre_proyecto_campaña && <span className="error-text">{formErrors.nombre_proyecto_campaña}</span>}
                     </div>
 
@@ -210,14 +186,10 @@ const NuevaProyectoPage = () => {
                     </div>
 
                     <div className="form-group floating-label">
-                        <select id="tipo_proyecto" name="tipo_proyecto" value={formData.tipo_proyecto || ''} onChange={handleChange} required>
-                            <option value="">Seleccione Tipo</option>
-                            {tiposProyecto.map(tipo => (
-                                <option key={tipo} value={tipo}>{tipo}</option>
-                            ))}
+                        <select id="tipo_proyecto" name="tipo_proyecto" value={formData.tipo_proyecto || ''} onChange={handleChange}>
+                            {tiposProyecto.map(tipo => (<option key={tipo} value={tipo}>{tipo}</option>))}
                         </select>
                         <label htmlFor="tipo_proyecto">Tipo de Proyecto</label>
-                        {formErrors.tipo_proyecto && <span className="error-text">{formErrors.tipo_proyecto}</span>}
                     </div>
 
                     <div className="form-group floating-label full-width">
@@ -267,27 +239,25 @@ const NuevaProyectoPage = () => {
                     </div>
 
                     <div className="form-group floating-label">
-                        <select id="estado_proyecto" name="estado_proyecto" value={formData.estado_proyecto || ''} onChange={handleChange} required>
-                            <option value="">Seleccione Estado</option>
-                            {estadosProyecto.map(estado => (
-                                <option key={estado} value={estado}>{estado}</option>
-                            ))}
+                        <select id="estado_proyecto" name="estado_proyecto" value={formData.estado_proyecto || ''} onChange={handleChange}>
+                            {estadosProyecto.map(estado => ( <option key={estado} value={estado}>{estado}</option> ))}
                         </select>
                         <label htmlFor="estado_proyecto">Estado del Proyecto</label>
-                        {formErrors.estado_proyecto && <span className="error-text">{formErrors.estado_proyecto}</span>}
                     </div>
 
                     <div className="form-group floating-label">
                         <select id="centro_costo_id_asociado" name="centro_costo_id_asociado" value={formData.centro_costo_id_asociado || ''} onChange={handleChange}>
                             <option value="">Seleccione Centro de Costo</option>
                             {centrosCosto.map(cc => (
-                                <option key={cc.centro_costo_id} value={cc.centro_costo_id}>{cc.nombre_centro_costo}</option>
+                                <option key={cc.centro_costo_id} value={cc.centro_costo_id}>
+                                    {cc.codigo_centro_costo} - {cc.nombre_centro_costo}
+                                </option>
                             ))}
                         </select>
                         <label htmlFor="centro_costo_id_asociado">Centro de Costo Asociado</label>
                     </div>
-                </div>
 
+                </div>
                 <div className="form-actions">
                     <button type="button" className="btn-secondary" onClick={() => navigate('/proyectos')}>Cancelar</button>
                     <button type="submit" className="btn-primary">Crear Proyecto</button>

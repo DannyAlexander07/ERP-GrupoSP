@@ -1,14 +1,26 @@
-// Archivo: backend/src/routes/centroCosto.routes.ts
+// Archivo: backend/src/routes/centroCosto.routes.ts (VERSIÓN COMPLETA)
 import { Router } from 'express';
-import { getCentrosCosto } from '../controllers/centroCosto.controller';
+import { 
+    getCentrosCosto,
+    getCentroCosto,
+    createCentroCosto,
+    updateCentroCosto,
+    deleteCentroCosto,
+    exportarCentrosCosto
+} from '../controllers/centroCosto.controller';
 import { verifyToken } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Protegemos las rutas de centros de costo
+// Protegemos todas las rutas de centros de costo
 router.use(verifyToken);
 
-// Ruta para obtener todos los centros de costo (con filtros y paginación)
-router.get('/', getCentrosCosto); 
+// Rutas CRUD completas
+router.get('/', getCentrosCosto);
+router.post('/', createCentroCosto);
+router.get('/export/excel', exportarCentrosCosto); // Ruta de exportación
+router.get('/:id', getCentroCosto);
+router.put('/:id', updateCentroCosto);
+router.delete('/:id', deleteCentroCosto);
 
 export default router;

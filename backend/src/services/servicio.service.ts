@@ -24,7 +24,7 @@ export interface Servicio {
     afecto_impuesto_principal?: boolean;
     porcentaje_impuesto_aplicable?: number;
     // ¡CAMBIO AQUÍ! Nombre de columna corregido a 'codigo' y tipo a 'string'
-    cuenta_contable_ingreso_predeterminada_codigo?: string; 
+    cuenta_contable_ingreso_predeterminada_id?: number | null; 
     activo_para_venta?: boolean;
     usuario_creacion_id?: number;
     fecha_creacion?: string;
@@ -55,51 +55,75 @@ export const getNextServicioCode = async (empresaId: number): Promise<string> =>
 };
 
 // Obtener servicios con filtros y paginación
-export const getAllServicios = async (empresaId: number, page: number, limit: number, filters: any): Promise<PagedResult<any>> => {
-    const allowedFilterKeys = ['codigo_servicio_interno', 'nombre_servicio', 'tipo_servicio', 'activo_para_venta']; // ¡CAMBIO AQUÍ! Añadir 'activo_para_venta'
+export const getAllServicios = async (empresaId: number, page: number, limit: number, filters: any, isActive?: boolean): Promise<PagedResult<any>> => {
+    // --- CONSULTA BASE (con todos los campos y JOINs correctos) ---
     let query = `
         SELECT 
-            s.servicio_id, s.codigo_servicio_interno, s.nombre_servicio, s.tipo_servicio, 
-            s.precio_base_unitario, s.activo_para_venta,
-            s.afecto_impuesto_principal, 
+            s.servicio_id,
+            s.codigo_servicio_interno,
+            s.nombre_servicio,
+            s.descripcion_detallada_servicio,
+            s.tipo_servicio,
+            s.unidad_medida,
+            s.precio_base_unitario,
+            s.activo_para_venta,
+            s.afecto_impuesto_principal,
             s.porcentaje_impuesto_aplicable,
-            u.nombres_completos_persona as creado_por
-        FROM servicios s
-        LEFT JOIN usuarios u ON s.usuario_creacion_id = u.usuario_id
+            s.cuenta_contable_ingreso_predeterminada_id,
+            m.nombre_moneda as moneda_nombre,
+            pc.codigo_cuenta as cuenta_contable_codigo
+        FROM public.servicios s
+        LEFT JOIN public.monedas m ON s.moneda_id_precio_base = m.moneda_id
+        LEFT JOIN public.plancontable pc ON s.cuenta_contable_ingreso_predeterminada_id = pc.cuenta_contable_id
         WHERE s.empresa_id_oferente = $1
     `;
-    const countQueryBase = `SELECT COUNT(*) FROM servicios s WHERE s.empresa_id_oferente = $1`;
 
+    // --- CONSULTA PARA CONTEO (con los mismos JOINs para filtros) ---
+    const countQueryBase = `
+        SELECT COUNT(*) 
+        FROM public.servicios s
+        LEFT JOIN public.monedas m ON s.moneda_id_precio_base = m.moneda_id
+        LEFT JOIN public.plancontable pc ON s.cuenta_contable_ingreso_predeterminada_id = pc.cuenta_contable_id
+        WHERE s.empresa_id_oferente = $1
+    `;
+    
     const queryParams: any[] = [empresaId];
     let whereClause = '';
     let paramIndex = 2;
 
+    // --- CONSTRUCCIÓN DINÁMICA DE FILTROS ---
+    if (isActive !== undefined) {
+        whereClause += ` AND s.activo_para_venta = $${paramIndex}`;
+        queryParams.push(isActive);
+        paramIndex++;
+    }
+
+    const allowedFilterKeys = ['codigo_servicio_interno', 'nombre_servicio', 'tipo_servicio'];
     Object.keys(filters).forEach(key => {
-        if (allowedFilterKeys.includes(key) && filters[key] !== undefined && filters[key] !== null) { // ¡CAMBIO AQUÍ! Verificar undefined/null
-            if (key === 'activo_para_venta') {
-                whereClause += ` AND s.${key} = $${paramIndex}`;
-                queryParams.push(filters[key]); // El valor ya será true/false
-            } else {
-                whereClause += ` AND s.${key}::text ILIKE $${paramIndex}`; 
-                queryParams.push(`%${filters[key]}%`);
-            }
+        if (allowedFilterKeys.includes(key) && filters[key]) {
+            whereClause += ` AND s.${key}::text ILIKE $${paramIndex}`;
+            queryParams.push(`%${filters[key]}%`);
             paramIndex++;
         }
     });
 
-    const finalQuery = query + whereClause + ' ORDER BY s.servicio_id DESC';
-    const finalCountQuery = countQueryBase + whereClause;
-    
-    const countParams = queryParams.slice(0, paramIndex - 1);
-    const totalResult = await pool.query(finalCountQuery, countParams);
+    // --- CORRECCIÓN DEFINITIVA DEL ERROR DE SINTAXIS ---
+    // Usamos plantillas literales para garantizar el espacio entre la consulta base y los filtros.
+    const finalCountQuery = `${countQueryBase}${whereClause}`;
+    const finalQuery = `${query}${whereClause} ORDER BY s.codigo_servicio_interno ASC`;
+
+    // --- EJECUCIÓN DE CONSULTAS ---
+    const totalResult = await pool.query(finalCountQuery, queryParams);
     const total_records = parseInt(totalResult.rows[0].count, 10);
     const total_pages = Math.ceil(total_records / limit) || 1;
 
     const offset = (page - 1) * limit;
+    
+    // Añadimos la paginación a la consulta final
     const paginatedQuery = `${finalQuery} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    const paginatedParams = [...countParams, limit, offset];
+    const finalParams = [...queryParams, limit, offset];
 
-    const recordsResult = await pool.query(paginatedQuery, paginatedParams);
+    const recordsResult = await pool.query(paginatedQuery, finalParams);
 
     return {
         records: recordsResult.rows,
@@ -172,23 +196,23 @@ export const createServicio = async (servicio: Servicio, usuarioId: number, nomb
         empresa_id_oferente, codigo_servicio_interno, nombre_servicio, tipo_servicio, 
         unidad_medida, moneda_id_precio_base, precio_base_unitario, descripcion_detallada_servicio,
         afecto_impuesto_principal, porcentaje_impuesto_aplicable, 
-        cuenta_contable_ingreso_predeterminada_codigo 
+        cuenta_contable_ingreso_predeterminada_id 
     } = servicio;
     
-    try { // <-- Bloque try añadido
+    try { 
         const result = await pool.query(
             `INSERT INTO servicios (
                 empresa_id_oferente, codigo_servicio_interno, nombre_servicio, tipo_servicio, unidad_medida, 
                 moneda_id_precio_base, precio_base_unitario, descripcion_detallada_servicio, afecto_impuesto_principal, 
-                porcentaje_impuesto_aplicable, cuenta_contable_ingreso_predeterminada_codigo, activo_para_venta,
+                porcentaje_impuesto_aplicable, cuenta_contable_ingreso_predeterminada_id, activo_para_venta,
                 usuario_creacion_id, fecha_creacion
-               ) 
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, TRUE, $12, NOW()) RETURNING *`,
+            ) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, TRUE, $12, NOW()) RETURNING *`, // <-- PARÉNTESIS CORREGIDO
             [
                 empresa_id_oferente, codigo_servicio_interno, nombre_servicio, tipo_servicio, unidad_medida, 
                 moneda_id_precio_base, precio_base_unitario, descripcion_detallada_servicio || null, 
                 afecto_impuesto_principal ?? true, porcentaje_impuesto_aplicable || null, 
-                cuenta_contable_ingreso_predeterminada_codigo || null,
+                cuenta_contable_ingreso_predeterminada_id || null,
                 usuarioId
             ]
         );
@@ -201,32 +225,34 @@ export const createServicio = async (servicio: Servicio, usuarioId: number, nomb
             tabla_afectada: 'servicios', 
             registro_afectado_id: nuevoServicio.servicio_id.toString(),
             valor_nuevo: JSON.stringify(nuevoServicio),
-            exito_operacion: true, // <-- Éxito
+            exito_operacion: true,
             modulo_sistema_origen: 'Servicios'
         });
 
         return nuevoServicio;
-    } catch (error: any) { // <-- Bloque catch añadido
+    } catch (error: any) {
         console.error("Error al crear servicio:", error);
         await logAuditoria({
             usuario_id_accion: usuarioId, 
             nombre_usuario_accion: nombreUsuario, 
             tipo_evento: 'CREACION',
             tabla_afectada: 'servicios', 
-            registro_afectado_id: servicio.servicio_id?.toString() || 'N/A', // Usar ID si está disponible
+            registro_afectado_id: servicio.servicio_id?.toString() || 'N/A',
             valor_nuevo: JSON.stringify(servicio),
-            exito_operacion: false, // <-- Fallo
+            exito_operacion: false,
             mensaje_error_si_fallo: error.message,
             modulo_sistema_origen: 'Servicios'
         });
-        throw error; // Re-lanzar el error para que el controlador lo maneje
+        throw error;
     }
-}
+};
+
 // Actualizar un servicio
 export const updateServicio = async (servicioId: number, servicioData: Partial<Servicio>, usuarioId: number, nombreUsuario: string) => {
+    // Primero, obtenemos el estado anterior del servicio para la auditoría
     const valorAnterior = await getServicioById(servicioId, servicioData.empresa_id_oferente!);
     if (!valorAnterior) {
-        // Si no se encuentra el servicio, también se puede loguear un fallo
+        // Logueamos el intento fallido
         await logAuditoria({
             usuario_id_accion: usuarioId,
             nombre_usuario_accion: nombreUsuario,
@@ -241,28 +267,47 @@ export const updateServicio = async (servicioId: number, servicioData: Partial<S
         throw new Error('Servicio no encontrado');
     }
 
-    try { // <-- Bloque try añadido
+    try {
+        // Combinamos los datos anteriores con los nuevos para asegurar que no se pierda información
         const dataToUpdate = { ...valorAnterior, ...servicioData };
 
         const result = await pool.query(
             `UPDATE servicios SET
-                codigo_servicio_interno = $1, nombre_servicio = $2, descripcion_detallada_servicio = $3,
-                tipo_servicio = $4, unidad_medida = $5, moneda_id_precio_base = $6,
-                precio_base_unitario = $7, afecto_impuesto_principal = $8, porcentaje_impuesto_aplicable = $9,
-                cuenta_contable_ingreso_predeterminada_codigo = $10, activo_para_venta = $11, 
-                usuario_modificacion_id = $12, fecha_modificacion = NOW()
-              WHERE servicio_id = $13 RETURNING *`,
+                codigo_servicio_interno = $1, 
+                nombre_servicio = $2, 
+                descripcion_detallada_servicio = $3,
+                tipo_servicio = $4, 
+                unidad_medida = $5, 
+                moneda_id_precio_base = $6,
+                precio_base_unitario = $7, 
+                afecto_impuesto_principal = $8, 
+                porcentaje_impuesto_aplicable = $9,
+                cuenta_contable_ingreso_predeterminada_id = $10, 
+                activo_para_venta = $11, 
+                usuario_modificacion_id = $12, 
+                fecha_modificacion = NOW()
+            WHERE servicio_id = $13 AND empresa_id_oferente = $14 -- <-- Se añadió el filtro de empresa para seguridad
+            RETURNING *`,
             [
-                dataToUpdate.codigo_servicio_interno, dataToUpdate.nombre_servicio, dataToUpdate.descripcion_detallada_servicio,
-                dataToUpdate.tipo_servicio, dataToUpdate.unidad_medida, dataToUpdate.moneda_id_precio_base,
-                dataToUpdate.precio_base_unitario, dataToUpdate.afecto_impuesto_principal, dataToUpdate.porcentaje_impuesto_aplicable,
-                dataToUpdate.cuenta_contable_ingreso_predeterminada_codigo,
+                dataToUpdate.codigo_servicio_interno, 
+                dataToUpdate.nombre_servicio, 
+                dataToUpdate.descripcion_detallada_servicio,
+                dataToUpdate.tipo_servicio, 
+                dataToUpdate.unidad_medida, 
+                dataToUpdate.moneda_id_precio_base,
+                dataToUpdate.precio_base_unitario, 
+                dataToUpdate.afecto_impuesto_principal, 
+                dataToUpdate.porcentaje_impuesto_aplicable,
+                dataToUpdate.cuenta_contable_ingreso_predeterminada_id,
                 dataToUpdate.activo_para_venta,
-                usuarioId, servicioId
+                usuarioId,
+                servicioId,
+                dataToUpdate.empresa_id_oferente // <-- Se añadió el parámetro para el WHERE
             ]
         );
         const servicioActualizado = result.rows[0];
 
+        // Logueamos la operación exitosa
         await logAuditoria({
             usuario_id_accion: usuarioId, 
             nombre_usuario_accion: nombreUsuario, 
@@ -271,13 +316,15 @@ export const updateServicio = async (servicioId: number, servicioData: Partial<S
             registro_afectado_id: servicioId.toString(),
             valor_anterior: JSON.stringify(valorAnterior), 
             valor_nuevo: JSON.stringify(servicioActualizado),
-            exito_operacion: true, // <-- Éxito
+            exito_operacion: true,
             modulo_sistema_origen: 'Servicios'
         });
 
         return servicioActualizado;
-    } catch (error: any) { // <-- Bloque catch añadido
+
+    } catch (error: any) {
         console.error("Error al actualizar servicio:", error);
+        // Logueamos el error en la auditoría
         await logAuditoria({
             usuario_id_accion: usuarioId, 
             nombre_usuario_accion: nombreUsuario, 
@@ -285,12 +332,12 @@ export const updateServicio = async (servicioId: number, servicioData: Partial<S
             tabla_afectada: 'servicios', 
             registro_afectado_id: servicioId.toString(),
             valor_anterior: JSON.stringify(valorAnterior),
-            valor_nuevo: JSON.stringify(servicioData), // Datos que se intentaron actualizar
-            exito_operacion: false, // <-- Fallo
+            valor_nuevo: JSON.stringify(servicioData),
+            exito_operacion: false,
             mensaje_error_si_fallo: error.message,
             modulo_sistema_origen: 'Servicios'
         });
-        throw error; // Re-lanzar el error
+        throw error; // Re-lanzamos el error para que el controlador lo maneje
     }
 };
 

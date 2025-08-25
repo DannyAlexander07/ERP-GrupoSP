@@ -75,7 +75,6 @@ apiClient.interceptors.request.use((config) => {
 
 // Obtener todas las cuentas contables con filtros y paginación (¡CONSULTA ACTUALIZADA!)
 export const getAllPlanContable = async (empresaId: number, page: number, limit: number, filters: PlanContableFilters): Promise<PagedResult<any>> => {
-    const allowedFilterKeys = ['codigo_cuenta', 'nombre_cuenta_contable', 'tipo_cuenta_general', 'estado_cuenta'];
     let query = `
         SELECT 
             pc.cuenta_contable_id, pc.codigo_cuenta, pc.nombre_cuenta_contable,
@@ -87,14 +86,14 @@ export const getAllPlanContable = async (empresaId: number, page: number, limit:
             pc.fecha_creacion,
             u_modificacion.nombres_completos_persona as modificado_por,
             pc.fecha_modificacion
-        FROM plancontable pc
-        LEFT JOIN monedas m ON pc.moneda_id_predeterminada_cuenta = m.moneda_id
-        LEFT JOIN plancontable pc_padre ON pc.cuenta_padre_id = pc_padre.cuenta_contable_id
-        LEFT JOIN usuarios u_creacion ON pc.usuario_creacion_id = u_creacion.usuario_id 
-        LEFT JOIN usuarios u_modificacion ON pc.usuario_modificacion_id = u_modificacion.usuario_id 
+        FROM public.plancontable pc
+        LEFT JOIN public.monedas m ON pc.moneda_id_predeterminada_cuenta = m.moneda_id
+        LEFT JOIN public.plancontable pc_padre ON pc.cuenta_padre_id = pc_padre.cuenta_contable_id
+        LEFT JOIN public.usuarios u_creacion ON pc.usuario_creacion_id = u_creacion.usuario_id 
+        LEFT JOIN public.usuarios u_modificacion ON pc.usuario_modificacion_id = u_modificacion.usuario_id 
         WHERE pc.empresa_id = $1
     `;
-    const countQueryBase = `SELECT COUNT(*) FROM plancontable pc WHERE pc.empresa_id = $1`;
+    const countQueryBase = `SELECT COUNT(*) FROM public.plancontable pc WHERE pc.empresa_id = $1`;
 
     const queryParams: any[] = [empresaId];
     let whereClause = '';
@@ -103,26 +102,27 @@ export const getAllPlanContable = async (empresaId: number, page: number, limit:
     Object.keys(filters).forEach(_key => {
         const key = _key as keyof PlanContableFilters; 
         const value = filters[key];
-        if (value !== undefined && value !== null) {
+        // Aseguramos que el filtro no esté vacío y no sea 'Todos'
+        if (value && value !== 'Todos') {
             whereClause += ` AND pc.${key}::text ILIKE $${paramIndex}`; 
             queryParams.push(`%${value}%`);
             paramIndex++;
         }
     });
-
-    const finalQuery = query + whereClause + ' ORDER BY pc.codigo_cuenta ASC';
+    // 1. Construimos la consulta de conteo final aplicando los filtros.
     const finalCountQuery = countQueryBase + whereClause;
     
-    const countParams = queryParams.slice(0, paramIndex - 1);
-    const totalResult = await pool.query(finalCountQuery, countParams);
+    // 2. Ejecutamos el conteo con los parámetros del filtro.
+    const totalResult = await pool.query(finalCountQuery, queryParams);
     const total_records = parseInt(totalResult.rows[0].count, 10);
     const total_pages = Math.ceil(total_records / limit) || 1;
 
+    // 3. Construimos la consulta de datos final, añadiendo paginación.
     const offset = (page - 1) * limit;
-    const paginatedQuery = `${finalQuery} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    const paginatedParams = [...countParams, limit, offset];
+    const finalQuery = `${query} ${whereClause} ORDER BY pc.codigo_cuenta ASC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    const paginatedParams = [...queryParams, limit, offset];
 
-    const recordsResult = await pool.query(paginatedQuery, paginatedParams);
+    const recordsResult = await pool.query(finalQuery, paginatedParams);
 
     return {
         records: recordsResult.rows,
@@ -247,6 +247,13 @@ export const updatePlanContable = async (cuentaId: number, cuentaData: Partial<C
     try {
         await client.query('BEGIN');
 
+        const dataToUpdate = {
+            ...valorAnterior,
+            ...cuentaData,
+            moneda_id_predeterminada_cuenta: cuentaData.moneda_id_predeterminada_cuenta || null,
+            cuenta_padre_id: cuentaData.cuenta_padre_id || null
+        };
+
         const result = await pool.query(
             `UPDATE plancontable SET
                 codigo_cuenta = $1, nombre_cuenta_contable = $2, tipo_cuenta_general = $3,
@@ -257,21 +264,13 @@ export const updatePlanContable = async (cuentaId: number, cuentaData: Partial<C
             WHERE cuenta_contable_id = $14 AND empresa_id = $15
             RETURNING *`,
             [
-                codigo_cuenta ?? valorAnterior.codigo_cuenta,
-                nombre_cuenta_contable ?? valorAnterior.nombre_cuenta_contable,
-                tipo_cuenta_general ?? valorAnterior.tipo_cuenta_general,
-                nivel_jerarquia_cuenta ?? valorAnterior.nivel_jerarquia_cuenta,
-                moneda_id_predeterminada_cuenta ?? valorAnterior.moneda_id_predeterminada_cuenta,
-                permite_movimientos_directos ?? valorAnterior.permite_movimientos_directos,
-                naturaleza_saldo_cuenta ?? valorAnterior.naturaleza_saldo_cuenta,
-                cuenta_padre_id ?? valorAnterior.cuenta_padre_id,
-                requiere_analisis_por_centro_costo ?? valorAnterior.requiere_analisis_por_centro_costo,
-                requiere_analisis_por_tercero ?? valorAnterior.requiere_analisis_por_tercero,
-                estado_cuenta ?? valorAnterior.estado_cuenta,
-                observaciones_cuenta ?? valorAnterior.observaciones_cuenta, 
+                dataToUpdate.codigo_cuenta, dataToUpdate.nombre_cuenta_contable, dataToUpdate.tipo_cuenta_general,
+                dataToUpdate.nivel_jerarquia_cuenta, dataToUpdate.moneda_id_predeterminada_cuenta, dataToUpdate.permite_movimientos_directos,
+                dataToUpdate.naturaleza_saldo_cuenta, dataToUpdate.cuenta_padre_id, dataToUpdate.requiere_analisis_por_centro_costo,
+                dataToUpdate.requiere_analisis_por_tercero, dataToUpdate.estado_cuenta, dataToUpdate.observaciones_cuenta, 
                 usuarioId, 
                 cuentaId,
-                cuentaData.empresa_id
+                dataToUpdate.empresa_id
             ]
         );
         const cuentaActualizada = result.rows[0];

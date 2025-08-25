@@ -39,9 +39,11 @@ export interface PagoRealizado {
     proveedor_razon_social?: string;
 }
 
-// Obtener todos los pagos realizados con filtros y paginación
+
+// --- ASEGÚRATE DE QUE ESTA FUNCIÓN ESTÉ ASÍ EN TU ARCHIVO ---
 export const getAllPagosRealizados = async (empresaId: number, page: number, limit: number, filters: any): Promise<PagedResult<any>> => {
-    const allowedFilterKeys = ['medio_pago_utilizado', 'proveedor_razon_social', 'estado_pago', 'fecha_efectiva_pago'];
+    
+    // --- CONSULTA PARA OBTENER LOS DATOS CON FILTROS ---
     let query = `
         SELECT 
             pr.pago_realizado_id, 
@@ -53,61 +55,59 @@ export const getAllPagosRealizados = async (empresaId: number, page: number, lim
             p.razon_social_o_nombres as proveedor_razon_social,
             cb.alias_o_descripcion_cuenta as cuenta_bancaria_nombre,
             u_creacion.nombres_completos_persona as creado_por
-            
         FROM public.pagosrealizadoscxp pr
         JOIN public.monedas m ON pr.moneda_id_pago = m.moneda_id
         LEFT JOIN public.proveedores p ON pr.proveedor_id_beneficiario = p.proveedor_id
         LEFT JOIN public.cuentasbancariaspropias cb ON pr.cuenta_bancaria_propia_origen_id = cb.cuenta_bancaria_id
-        
-        -- ¡CORRECCIÓN AQUÍ! Añadimos el LEFT JOIN a la tabla de usuarios
         LEFT JOIN public.usuarios u_creacion ON pr.usuario_creacion_id = u_creacion.usuario_id
-
         WHERE pr.empresa_id_pagadora = $1
     `;
+    
+    const queryParams: any[] = [empresaId];
+    let whereClause = '';
+    let paramIndex = 2;
+
+    const allowedFilterKeys = ['medio_pago_utilizado', 'proveedor_razon_social', 'estado_pago', 'fecha_efectiva_pago'];
+
+    Object.keys(filters).forEach(key => {
+        if (allowedFilterKeys.includes(key) && filters[key]) {
+            if (key === 'proveedor_razon_social') {
+                whereClause += ` AND p.razon_social_o_nombres ILIKE $${paramIndex}`;
+            } else {
+                whereClause += ` AND pr.${key}::text ILIKE $${paramIndex}`;
+            }
+            queryParams.push(`%${filters[key]}%`);
+            paramIndex++;
+        }
+    });
+
+    // --- CONSULTA PARA CONTAR EL TOTAL DE REGISTROS CON FILTROS ---
     const countQueryBase = `
         SELECT COUNT(*) 
         FROM public.pagosrealizadoscxp pr
         LEFT JOIN public.proveedores p ON pr.proveedor_id_beneficiario = p.proveedor_id
         WHERE pr.empresa_id_pagadora = $1
     `;
-
-    const queryParams: any[] = [empresaId];
-    let whereClause = '';
-    let paramIndex = 2;
-
-    Object.keys(filters).forEach(key => {
-        if (allowedFilterKeys.includes(key) && filters[key]) {
-            if (key === 'proveedor_razon_social') {
-                // Necesitamos el JOIN con proveedores en la query de conteo si vamos a filtrar por su nombre
-                whereClause += ` AND p.razon_social_o_nombres ILIKE $${paramIndex}`;
-                queryParams.push(`%${filters[key]}%`);
-            } else {
-                whereClause += ` AND pr.${key}::text ILIKE $${paramIndex}`;
-                queryParams.push(`%${filters[key]}%`);
-            }
-            paramIndex++;
-        }
+    const finalCountQuery = countQueryBase + whereClause.replace(/\$\d+/g, (match, offset, string) => {
+        const index = parseInt(match.substring(1));
+        return `$${index - (string.substring(0, offset).match(/pr\./g) || []).length}`;
     });
-
-    const finalQuery = query + whereClause + ' ORDER BY pr.fecha_efectiva_pago DESC, pr.pago_realizado_id DESC';
-    const finalCountQuery = countQueryBase + whereClause;
     
-    const countParams = queryParams.slice(0, paramIndex - 1);
+    const countParams = queryParams.slice(0, paramIndex-1);
     const totalResult = await pool.query(finalCountQuery, countParams);
     const total_records = parseInt(totalResult.rows[0].count, 10);
-    const total_pages = Math.ceil(total_records / limit) || 1;
 
     const offset = (page - 1) * limit;
-    const paginatedQuery = `${finalQuery} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    const paginatedParams = [...countParams, limit, offset];
+    const finalQuery = `${query} ${whereClause} ORDER BY pr.fecha_efectiva_pago DESC, pr.pago_realizado_id DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    const finalParams = [...queryParams, limit, offset];
 
-    const recordsResult = await pool.query(paginatedQuery, paginatedParams);
+    const result = await pool.query(finalQuery, finalParams);
 
     return {
-        records: recordsResult.rows,
-        total_records,
-        total_pages,
-        current_page: page,
+        records: result.rows,
+        total_records: total_records,
+        total_pages: Math.ceil(total_records / limit) || 1,
+        current_page: page
     };
 };
 

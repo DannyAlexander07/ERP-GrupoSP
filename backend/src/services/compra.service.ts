@@ -72,69 +72,62 @@ export const getNextCompraDocumentNumber = async (empresaId: number, tipoComprob
 
 // Obtener todas las facturas de compra con filtros y paginación
 export const getAllFacturasCompra = async (empresaId: number, page: number, limit: number, filters: any): Promise<PagedResult<any>> => {
-    const allowedFilterKeys = ['numero_documento_proveedor', 'proveedor_razon_social', 'estado_factura_compra', 'fecha_recepcion_documento'];
+    
     let query = `
         SELECT 
-            fc.obligacion_id as factura_compra_id, -- Mapeo de ID
-            fc.numero_documento_proveedor, fc.fecha_recepcion_documento,
-            fc.monto_total_original_obligacion, 
-            fc.estado_obligacion as estado_factura_compra, -- Mapeo de estado
+            o.obligacion_id as factura_compra_id, o.numero_documento_proveedor,
             p.razon_social_o_nombres as proveedor_razon_social,
-            tc.descripcion_comprobante as tipo_comprobante_descripcion,
-            m.nombre_moneda as moneda_nombre
-            -- Columnas de auditoría eliminadas de la selección
-        FROM Obligaciones fc -- ¡CAMBIO DE NOMBRE DE TABLA!
-        JOIN Proveedores p ON fc.proveedor_id = p.proveedor_id
-        JOIN TiposComprobanteCompra tc ON fc.tipo_comprobante_compra_id = tc.tipo_comprobante_compra_id
-        JOIN Monedas m ON fc.moneda_id_obligacion = m.moneda_id
-        -- JOINs para usuarios de auditoría eliminados
-        WHERE fc.empresa_id_deudora = $1 -- ¡CAMBIO DE NOMBRE DE COLUMNA!
+            t.descripcion_comprobante as tipo_comprobante_descripcion,
+            o.fecha_recepcion_documento, m.nombre_moneda as moneda_nombre,
+            o.monto_total_original_obligacion, o.estado_obligacion as estado_factura_compra
+        FROM public.obligaciones o
+        LEFT JOIN public.proveedores p ON o.proveedor_id = p.proveedor_id
+        LEFT JOIN public.tiposcomprobantecompra t ON o.tipo_comprobante_compra_id = t.tipo_comprobante_compra_id
+        LEFT JOIN public.monedas m ON o.moneda_id_obligacion = m.moneda_id
+        WHERE o.empresa_id_deudora = $1
     `;
-    const countQueryBase = `SELECT COUNT(*) FROM Obligaciones fc WHERE fc.empresa_id_deudora = $1`; // ¡CAMBIO DE NOMBRE DE TABLA Y COLUMNA!
+    
+    const countQueryBase = `
+        SELECT COUNT(*) 
+        FROM public.obligaciones o
+        LEFT JOIN public.proveedores p ON o.proveedor_id = p.proveedor_id
+        WHERE o.empresa_id_deudora = $1
+    `;
 
     const queryParams: any[] = [empresaId];
     let whereClause = '';
     let paramIndex = 2;
+    const allowedFilterKeys = ['numero_documento_proveedor', 'proveedor_razon_social', 'estado_factura_compra'];
 
     Object.keys(filters).forEach(key => {
-        if (allowedFilterKeys.includes(key) && filters[key]) {
-            if (key === 'fecha_recepcion_documento') {
-                whereClause += ` AND fc.${key} = $${paramIndex}`;
-                queryParams.push(filters[key]);
-            } else if (key === 'proveedor_razon_social') {
+        const value = filters[key];
+        if (allowedFilterKeys.includes(key) && value) {
+            if (key === 'proveedor_razon_social') {
                 whereClause += ` AND p.razon_social_o_nombres ILIKE $${paramIndex}`;
-                queryParams.push(`%${filters[key]}%`);
-            } else if (key === 'estado_factura_compra') { // Manejar el filtro por el nuevo nombre
-                whereClause += ` AND fc.estado_obligacion ILIKE $${paramIndex}`;
-                queryParams.push(`%${filters[key]}%`);
+            } else {
+                const dbKey = key === 'estado_factura_compra' ? 'estado_obligacion' : key;
+                whereClause += ` AND o.${dbKey}::text ILIKE $${paramIndex}`;
             }
-            else {
-                whereClause += ` AND fc.${key}::text ILIKE $${paramIndex}`; 
-                queryParams.push(`%${filters[key]}%`);
-            }
+            queryParams.push(`%${value}%`);
             paramIndex++;
         }
     });
 
-    const finalQuery = query + whereClause + ' ORDER BY fc.fecha_recepcion_documento DESC, fc.obligacion_id DESC'; // Mapeo de ID
     const finalCountQuery = countQueryBase + whereClause;
-    
-    const countParams = queryParams.slice(0, paramIndex - 1);
-    const totalResult = await pool.query(finalCountQuery, countParams);
+    const totalResult = await pool.query(finalCountQuery, queryParams);
     const total_records = parseInt(totalResult.rows[0].count, 10);
-    const total_pages = Math.ceil(total_records / limit) || 1;
 
     const offset = (page - 1) * limit;
-    const paginatedQuery = `${finalQuery} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    const paginatedParams = [...countParams, limit, offset];
+    const finalQuery = `${query} ${whereClause} ORDER BY o.fecha_recepcion_documento DESC, o.obligacion_id DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    const finalParams = [...queryParams, limit, offset];
 
-    const recordsResult = await pool.query(paginatedQuery, paginatedParams);
-
+    const result = await pool.query(finalQuery, finalParams);
+    
     return {
-        records: recordsResult.rows,
-        total_records,
-        total_pages,
-        current_page: page,
+        records: result.rows.map(row => ({ ...row, id: row.factura_compra_id })),
+        total_records: total_records,
+        total_pages: Math.ceil(total_records / limit) || 1,
+        current_page: page
     };
 };
 
@@ -545,12 +538,24 @@ export const deleteFacturaCompra = async (facturaId: number, empresaId: number, 
 };
 
 async function generarAsientoDeCompra(factura: FacturaCompra, client: any, usuarioId: number, nombreUsuario: string) {
-    // --- ¡IMPORTANTE! Reemplaza estos IDs de ejemplo con los que encontraste en el Paso 1 ---
-    const CUENTA_GASTO_GENERICA = 4;      // <-- REEMPLAZAR (Ej: ID de la cuenta "636 Servicios Básicos")
-    const CUENTA_IGV_CREDITO_FISCAL = 5;  // <-- REEMPLAZAR (Ej: ID de la cuenta "40111 IGV - Crédito Fiscal")
-    const CUENTA_PROVEEDORES = 6;         // <-- REEMPLAZAR (Ej: ID de la cuenta "4212 Cuentas por Pagar Comerciales")
+    const CUENTA_GASTO_GENERICA = 4;
+    const CUENTA_IGV_CREDITO_FISCAL = 5;
+    const CUENTA_PROVEEDORES = 6;
 
-    // Asumimos IGV del 18% para el cálculo inverso del subtotal
+    const fechaFactura = new Date(factura.fecha_recepcion_documento);
+    const anioFactura = fechaFactura.getFullYear();
+    const mesFactura = fechaFactura.getMonth() + 1;
+
+    const periodoResult = await client.query(
+        'SELECT periodo_contable_id FROM public.periodoscontables WHERE anio_ejercicio = $1 AND mes_ejercicio = $2 AND empresa_id = $3',
+        [anioFactura, mesFactura, factura.empresa_id_compradora]
+    );
+
+    if (periodoResult.rows.length === 0) {
+        throw new Error(`No se encontró un período contable abierto para la fecha ${factura.fecha_recepcion_documento}.`);
+    }
+    const periodoId = periodoResult.rows[0].periodo_contable_id;
+    
     const montoTotal = Number(factura.monto_total_original_obligacion);
     const montoIGV = parseFloat((montoTotal / 1.18 * 0.18).toFixed(2));
     const subtotal = montoTotal - montoIGV;
@@ -563,13 +568,12 @@ async function generarAsientoDeCompra(factura: FacturaCompra, client: any, usuar
     
     const asientoCabecera: asientoContableService.AsientoContableCabecera = {
         empresa_id: factura.empresa_id_compradora!,
-        periodo_contable_id: 1, // TEMPORAL: Idealmente, buscar el periodo contable abierto para la fecha de recepción
-        tipo_asiento_contable_id: 2, // Asumiendo que el ID 2 es "Asiento de Compra"
+        periodo_contable_id: periodoId,
+        tipo_asiento_contable_id: 2,
         fecha_contabilizacion_asiento: factura.fecha_recepcion_documento,
         moneda_id_asiento: factura.moneda_id_obligacion,
         glosa_principal_asiento: `Por la compra según doc. ${factura.numero_documento_proveedor} de ${factura.proveedor_razon_social}`,
-        total_debe_asiento: 0, 
-        total_haber_asiento: 0, 
+        total_debe_asiento: 0, total_haber_asiento: 0,
         origen_documento_referencia_id: factura.factura_compra_id,
         origen_documento_tabla_referencia: 'obligaciones',
         detalles: asientoDetalles,

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+//Archivo: frontend/src/pages/reportes/LibrosElectronicosPage.tsx
+import  { useState } from 'react';
 import { descargarPleCompras, descargarPleVentas } from '../../services/reporteService';
 import { Download } from 'lucide-react';
 import '../../styles/TablePage.css'; // Reutilizamos estilos generales

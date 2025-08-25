@@ -73,60 +73,85 @@ apiClient.interceptors.request.use((config) => {
 });
 
 // Obtener todas las cuentas bancarias con filtros y paginación (¡CONSULTA ACTUALIZADA!)
-export const getAllCuentasBancarias = async (empresaId: number, page: number, limit: number, filters: CuentaBancariaFilters): Promise<PagedResult<any>> => {
+export const getAllCuentasBancarias = async (empresaId: number, page: number, limit: number, filters: any): Promise<PagedResult<any>> => {
+    
+    // Lista de filtros permitidos
     const allowedFilterKeys = ['nombre_banco', 'numero_cuenta_unico', 'estado_cuenta_bancaria'];
-    let query = `
-        SELECT 
-            cb.cuenta_bancaria_id, cb.nombre_banco, cb.tipo_cuenta_bancaria,
-            cb.numero_cuenta_unico, cb.moneda_id, m.nombre_moneda as moneda_nombre,
-            cb.saldo_disponible_actual, cb.estado_cuenta_bancaria,
-            cb.usuario_creacion_id,
-            cb.fecha_creacion,
-            u_creacion.nombres_completos_persona as creado_por,
-            cb.usuario_modificacion_id,
-            cb.fecha_modificacion,
-            u_modificacion.nombres_completos_persona as modificado_por
-        FROM cuentasbancariaspropias cb
-        JOIN monedas m ON cb.moneda_id = m.moneda_id
-        LEFT JOIN Usuarios u_creacion ON cb.usuario_creacion_id = u_creacion.usuario_id
-        LEFT JOIN Usuarios u_modificacion ON cb.usuario_modificacion_id = u_modificacion.usuario_id
-        WHERE cb.empresa_id = $1
-    `;
-    const countQueryBase = `SELECT COUNT(*) FROM cuentasbancariaspropias cb WHERE cb.empresa_id = $1`;
 
-    const queryParams: any[] = [empresaId];
+    let queryParams: any[] = [empresaId];
     let whereClause = '';
     let paramIndex = 2;
 
-    Object.keys(filters).forEach(_key => {
-        const key = _key as keyof CuentaBancariaFilters; 
-        const value = filters[key];
-        if (value !== undefined && value !== null) {
-            whereClause += ` AND cb.${key}::text ILIKE $${paramIndex}`; 
-            queryParams.push(`%${value}%`);
-            paramIndex++;
+    // Construimos la cláusula WHERE dinámicamente
+    Object.keys(filters).forEach(key => {
+        if (allowedFilterKeys.includes(key) && filters[key]) {
+            if (key === 'estado_cuenta_bancaria' && filters[key] === 'Todos') {
+                // No hacer nada si el filtro es 'Todos'
+            } else {
+                 // Para los filtros de texto usamos ILIKE para que no distinga mayúsculas/minúsculas
+                whereClause += ` AND cb.${key}::text ILIKE $${paramIndex}`;
+                queryParams.push(`%${filters[key]}%`);
+                paramIndex++;
+            }
         }
     });
 
-    const finalQuery = query + whereClause + ' ORDER BY cb.nombre_banco ASC, cb.numero_cuenta_unico ASC';
-    const finalCountQuery = countQueryBase + whereClause;
-    
-    const countParams = queryParams.slice(0, paramIndex - 1);
-    const totalResult = await pool.query(finalCountQuery, countParams);
+    // Consulta para contar el total de registros con los filtros aplicados
+    const countQuery = `SELECT COUNT(*) FROM public.cuentasbancariaspropias cb WHERE cb.empresa_id = $1 ${whereClause}`;
+    const totalResult = await pool.query(countQuery, queryParams);
     const total_records = parseInt(totalResult.rows[0].count, 10);
-    const total_pages = Math.ceil(total_records / limit) || 1;
 
+    // Consulta principal que calcula el saldo y aplica los filtros
+    const query = `
+        WITH EgresosPorCuenta AS (
+            SELECT 
+                cuenta_bancaria_propia_origen_id as cuenta_id,
+                COALESCE(SUM(monto_total_desembolsado), 0) as total_egresos
+            FROM public.pagosrealizadoscxp
+            WHERE empresa_id_pagadora = $1
+            GROUP BY cuenta_bancaria_propia_origen_id
+        ),
+        IngresosPorCuenta AS (
+            SELECT
+                cuenta_bancaria_propia_destino_id as cuenta_id,
+                COALESCE(SUM(monto_total_pagado_cliente), 0) as total_ingresos
+            FROM public.pagosrecibidoscxc
+            WHERE empresa_id_receptora = $1
+            GROUP BY cuenta_bancaria_propia_destino_id
+        )
+        SELECT 
+            cb.cuenta_bancaria_id,
+            cb.nombre_banco,
+            cb.tipo_cuenta_bancaria,
+            cb.numero_cuenta_unico,
+            cb.alias_o_descripcion_cuenta,
+            cb.estado_cuenta_bancaria,
+            m.nombre_moneda as moneda_nombre,
+            (COALESCE(cb.saldo_contable_inicial, 0) + COALESCE(ic.total_ingresos, 0) - COALESCE(ec.total_egresos, 0)) as saldo_disponible_actual
+        FROM 
+            public.cuentasbancariaspropias cb
+        JOIN 
+            public.monedas m ON cb.moneda_id = m.moneda_id
+        LEFT JOIN 
+            EgresosPorCuenta ec ON cb.cuenta_bancaria_id = ec.cuenta_id
+        LEFT JOIN 
+            IngresosPorCuenta ic ON cb.cuenta_bancaria_id = ic.cuenta_id
+        WHERE
+            cb.empresa_id = $1 ${whereClause} -- <-- Se aplica el filtro aquí
+    `;
+    
     const offset = (page - 1) * limit;
-    const paginatedQuery = `${finalQuery} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    const paginatedParams = [...countParams, limit, offset];
+    // Añadimos la paginación a la consulta final
+    const finalQuery = `${query} ORDER BY cb.nombre_banco LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    const finalParams = [...queryParams, limit, offset];
 
-    const recordsResult = await pool.query(paginatedQuery, paginatedParams);
+    const result = await pool.query(finalQuery, finalParams);
 
     return {
-        records: recordsResult.rows,
-        total_records,
-        total_pages,
-        current_page: page,
+        records: result.rows,
+        total_records: total_records,
+        total_pages: Math.ceil(total_records / limit) || 1,
+        current_page: page
     };
 };
 

@@ -74,6 +74,24 @@ const ListaServiciosPage = () => {
 
     const [formData, setFormData] = useState<Partial<Servicio>>(initialFormData);
 
+    const loadData = useCallback(async () => {
+        try {
+            setLoading(true);
+            const [serviciosData, cuentasData] = await Promise.all([
+                fetchServicios(currentPage, ROWS_PER_PAGE, filters),
+                fetchPlanContable(1, 9999, {})
+            ]);
+            setServicios(serviciosData.records);
+            setTotalPages(serviciosData.total_pages);
+            setTotalRecords(serviciosData.total_records);
+            setCuentasContables(cuentasData.records);
+        } catch (error) {
+            if (error instanceof Error) showErrorAlert(error.message);
+        } finally {
+            setLoading(false);
+        }
+    }, [currentPage, filters]);
+
     // Cargar servicios y también las cuentas contables
     const loadServicios = useCallback(async () => {
         try {
@@ -102,12 +120,7 @@ const ListaServiciosPage = () => {
         }
     }, [currentPage, filters, selectedServicio]); // Añadir selectedServicio a las dependencias
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            loadServicios();
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [loadServicios]);
+    useEffect(() => { loadData(); }, [loadData]);
 
     const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -203,15 +216,15 @@ const ListaServiciosPage = () => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
         const isCheckbox = type === 'checkbox';
-        
-        let inputValue: string | boolean | number | undefined = isCheckbox ? (e.target as HTMLInputElement).checked : value;
+        let finalValue: string | boolean | number | null | undefined = isCheckbox ? (e.target as HTMLInputElement).checked : value;
 
-        if (name === 'precio_base_unitario' || name === 'porcentaje_impuesto_aplicable' || name === 'moneda_id_precio_base' || name === 'cuenta_contable_ingreso_predeterminada_id') {
-             inputValue = value === '' ? undefined : Number(value); // Convertir a número si es un campo numérico/ID
+        if (['precio_base_unitario', 'porcentaje_impuesto_aplicable', 'moneda_id_precio_base', 'cuenta_contable_ingreso_predeterminada_id'].includes(name)) {
+            finalValue = value === '' ? null : Number(value);
         }
         
-        setFormData(prev => ({ ...prev, [name]: inputValue }));
+        setFormData(prev => ({ ...prev, [name]: finalValue }));
     };
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -424,8 +437,6 @@ const ListaServiciosPage = () => {
                                 value={formData.cuenta_contable_ingreso_predeterminada_id || ''} 
                                 onChange={handleChange} 
                                 disabled={isViewMode}
-                                className={formErrors.cuenta_contable_ingreso_predeterminada_id ? 'error' : ''}
-                                required
                             >
                                 <option value="">Seleccione Cuenta Contable</option>
                                 {cuentasContables.map(cuenta => (
@@ -435,7 +446,6 @@ const ListaServiciosPage = () => {
                                 ))}
                             </select>
                             <label htmlFor="cuenta_contable_ingreso_predeterminada_id">Cuenta Contable Ingreso</label>
-                            {formErrors.cuenta_contable_ingreso_predeterminada_id && <span className="error-text">{formErrors.cuenta_contable_ingreso_predeterminada_id}</span>}
                         </div>
                         {/* FIN CAMBIO CLAVE */}
                         {selectedServicio && (

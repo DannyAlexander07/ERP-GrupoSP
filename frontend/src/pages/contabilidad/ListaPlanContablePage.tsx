@@ -179,16 +179,25 @@ const ListaPlanContablePage = () => {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value, type } = e.target;
-        let inputValue: string | number | boolean | undefined = value;
+        
+        let finalValue: string | number | boolean | null | undefined = value;
 
         if (type === 'checkbox') {
-            inputValue = (e.target as HTMLInputElement).checked;
-        } else if (name.includes('nivel_jerarquia_cuenta') || name.includes('_id')) { 
-            inputValue = value === '' ? undefined : Number(value);
+            finalValue = (e.target as HTMLInputElement).checked;
+        } 
+        // Identificamos los campos que son IDs numéricos y pueden ser opcionales
+        else if (['moneda_id_predeterminada_cuenta', 'cuenta_padre_id'].includes(name)) {
+            // Si el valor está vacío (ej: el usuario selecciona "Seleccione Moneda"), lo convertimos a null.
+            finalValue = value === '' ? null : Number(value);
         }
-        
-        setFormData(prev => ({ ...prev, [name]: inputValue }));
+        // Para otros campos que son números pero no IDs opcionales
+        else if (['nivel_jerarquia_cuenta'].includes(name)) {
+            finalValue = value === '' ? 0 : Number(value);
+        }
+
+        setFormData(prev => ({ ...prev, [name]: finalValue }));
     };
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

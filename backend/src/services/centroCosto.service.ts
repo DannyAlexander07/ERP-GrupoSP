@@ -44,6 +44,7 @@
             SELECT 
                 cc.centro_costo_id, cc.codigo_centro_costo, cc.nombre_centro_costo,
                 cc.tipo_centro_costo, cc.estado, cc.presupuesto_asignado,
+                cc.descripcion_centro_costo,
                 u.nombres_completos_persona as responsable_nombre,
                 cc_padre.codigo_centro_costo as centro_costo_padre_codigo,
                 cc_padre.nombre_centro_costo as centro_costo_padre_nombre,

@@ -7,7 +7,7 @@ import { saveAs } from 'file-saver'; // Para la descarga de archivos
 export interface DetalleFacturaVenta {
     detalle_factura_venta_id?: number;
     factura_venta_id?: number; // Opcional al crear, se asigna después
-    servicio_id: number; // Referencia al servicio vendido
+    servicio_id: number | undefined; // Referencia al servicio vendido
     numero_linea_item: number;
     codigo_item_servicio_factura?: string; // Podría ser el código del servicio
     descripcion_item_servicio_factura: string;
@@ -30,8 +30,8 @@ export interface FacturaVenta {
     empresa_id_emisora?: number; // Se asignará en el controlador del backend
     cliente_id: number;
     tipo_comprobante_venta_id: number;
-    serie_comprobante: string;
-    numero_correlativo_comprobante?: number;
+    serie_comprobante: string; 
+    numero_correlativo_comprobante: number;
     numero_completo_comprobante?: string; // Se genera en el backend
     fecha_emision: string; // DATE en DB, string en TS para manejo fácil
     fecha_vencimiento?: string;
@@ -142,7 +142,7 @@ export const fetchFacturaVentaById = async (id: number): Promise<FacturaVenta> =
 };
 
 // Crear una nueva factura de venta
-export const createFacturaVenta = async (facturaData: Omit<FacturaVenta, 'factura_venta_id' | 'empresa_id_emisora' | 'numero_correlativo_comprobante' | 'numero_completo_comprobante' | 'estado_factura' | 'monto_total_pagado' | 'saldo_pendiente_cobro' | 'creado_por' | 'fecha_creacion' | 'modificado_por' | 'fecha_modificacion'>): Promise<FacturaVenta> => {
+export const createFacturaVenta = async (facturaData: Partial<FacturaVenta>): Promise<FacturaVenta> => {
     try {
         const response = await apiClient.post('/', facturaData);
         return response.data;
@@ -255,6 +255,20 @@ export const aplicarSaldoAFactura = async (facturaId: number): Promise<FacturaVe
     } catch (error) {
         if (axios.isAxiosError(error) && error.response) {
             throw new Error(error.response.data.message || 'Error al aplicar el saldo a favor.');
+        }
+        throw new Error('No se pudo conectar con el servidor.');
+    }
+};
+
+// --- ¡NUEVA FUNCIÓN! ---
+export const enviarFacturaASunat = async (facturaId: number): Promise<{ exito: boolean; mensaje: string; hash: string }> => {
+    try {
+        // Hacemos una petición POST al nuevo endpoint que creamos en el backend
+        const response = await apiClient.post(`/${facturaId}/enviar-sunat`);
+        return response.data;
+    } catch (error) {
+        if (axios.isAxiosError(error) && error.response) {
+            throw new Error(error.response.data.message || 'Error en el proceso de envío a SUNAT.');
         }
         throw new Error('No se pudo conectar con el servidor.');
     }

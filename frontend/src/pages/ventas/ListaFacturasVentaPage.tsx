@@ -11,6 +11,7 @@ import {
     downloadFacturaVentaXml,
     downloadFacturaVentaCdr,
     downloadFacturaVentaPdf,
+    enviarFacturaASunat,
     type FacturaVenta,
     aplicarSaldoAFactura,
     type DetalleFacturaVenta,
@@ -22,7 +23,7 @@ import { fetchServicios, type Servicio } from '../../services/servicioService';
 import { showSuccessToast, showErrorAlert, showConfirmDialog, showValidationErrorAlert } from '../../services/notificationService';
 import Modal from '../../components/common/Modal';
 // Se eliminan las importaciones de iconos individuales de lucide-react (Eye, Edit, Trash)
-import { FileDown, FilterX, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus } from 'lucide-react'; 
+import { FileDown, FilterX, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Plus, Send } from 'lucide-react';
 import '../../styles/TablePage.css';
 
 interface FormErrors { [key: string]: string; }
@@ -95,7 +96,7 @@ const ListaFacturasVentaPage = () => {
     const initialFormData: Partial<FacturaVenta> = {
         cliente_id: undefined,
         tipo_comprobante_venta_id: tiposComprobanteVenta[0].id,
-        serie_comprobante: 'F001', 
+        numero_completo_comprobante: '', 
         fecha_emision: new Date().toISOString().split('T')[0], 
         moneda_id: monedas[0].id,
         monto_total_factura: 0,
@@ -308,37 +309,48 @@ const ListaFacturasVentaPage = () => {
     const handleDetalleChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         const updatedDetalles = [...(formData.detalles || [])];
-        let inputValue: string | number | undefined = value;
+        let finalValue: string | number | undefined = value;
 
-        if (name.includes('cantidad') || name.includes('valor_unitario') || name.includes('monto') || name.includes('porcentaje')) {
-            inputValue = value === '' ? undefined : Number(value);
-        } else if (name === 'servicio_id') {
-            inputValue = Number(value);
-            const selectedService = servicios.find(s => s.servicio_id === inputValue);
+        // --- PASO 1: Convertir el valor a NÚMERO si el campo lo requiere ---
+        if ([
+            'servicio_id', 
+            'cantidad', 
+            'valor_unitario_sin_impuestos', 
+            'monto_descuento_item', 
+            'porcentaje_impuesto_principal_item',
+            'centro_costo_id'
+        ].includes(name)) {
+            finalValue = value === '' ? undefined : Number(value);
+        }
+        
+        // Asignamos el valor ya convertido al detalle
+        updatedDetalles[index] = {
+            ...updatedDetalles[index],
+            [name]: finalValue,
+        };
+
+        // --- PASO 2: Si el campo que cambió fue 'servicio_id', actualizamos los datos del servicio ---
+        if (name === 'servicio_id') {
+            const selectedService = servicios.find(s => s.servicio_id === finalValue);
             if (selectedService) {
                 updatedDetalles[index] = {
                     ...updatedDetalles[index],
-                    servicio_id: inputValue,
                     descripcion_item_servicio_factura: selectedService.nombre_servicio,
                     unidad_medida_item: selectedService.unidad_medida,
                     valor_unitario_sin_impuestos: selectedService.precio_base_unitario,
-                    porcentaje_impuesto_principal_item: selectedService.afecto_impuesto_principal ? selectedService.porcentaje_impuesto_aplicable : 0,
+                    porcentaje_impuesto_principal_item: selectedService.afecto_impuesto_principal ? (selectedService.porcentaje_impuesto_aplicable || 18) : 0,
                     tipo_afectacion_impuesto_principal: selectedService.afecto_impuesto_principal ? 'Gravado' : 'Exonerado',
                 };
             }
         }
 
-        updatedDetalles[index] = {
-            ...updatedDetalles[index],
-            [name]: inputValue,
-        };
-
-        // Recalcular montos de línea
+        // --- PASO 3: Recalculamos SIEMPRE los montos de la línea para mantener la consistencia ---
         const cantidad = updatedDetalles[index].cantidad || 0;
         const valorUnitario = updatedDetalles[index].valor_unitario_sin_impuestos || 0;
         const porcentajeImpuesto = updatedDetalles[index].porcentaje_impuesto_principal_item || 0;
+        const descuentoItem = updatedDetalles[index].monto_descuento_item || 0;
 
-        const subtotalSinImpuestos = cantidad * valorUnitario;
+        const subtotalSinImpuestos = (cantidad * valorUnitario) - descuentoItem;
         const montoImpuesto = subtotalSinImpuestos * (porcentajeImpuesto / 100);
         const montoTotalLinea = subtotalSinImpuestos + montoImpuesto;
 
@@ -346,8 +358,9 @@ const ListaFacturasVentaPage = () => {
         updatedDetalles[index].monto_impuesto_principal_item = parseFloat(montoImpuesto.toFixed(2));
         updatedDetalles[index].monto_total_linea_item = parseFloat(montoTotalLinea.toFixed(2));
 
+        // Finalmente, actualizamos el estado del formulario y los totales de la cabecera
         setFormData(prev => ({ ...prev, detalles: updatedDetalles }));
-        recalculateTotals(updatedDetalles);
+        recalculateTotals(updatedDetalles); 
     };
 
     const addDetalle = () => {
@@ -442,9 +455,9 @@ const ListaFacturasVentaPage = () => {
     }, [formData.detalles]);
 
 
+    // Reemplaza esta función en ListaFacturasVentaPage.tsx
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
         const errors = validateForm();
         if (Object.keys(errors).length > 0) {
             showValidationErrorAlert(errors);
@@ -452,13 +465,36 @@ const ListaFacturasVentaPage = () => {
         }
 
         try {
+            let dataToSend: Partial<FacturaVenta> = { ...formData };
+
             if (selectedFactura) {
-                await updateFacturaVenta(selectedFactura.factura_venta_id!, formData);
+                // Lógica para ACTUALIZAR (si es necesaria)
+                // Si el número completo se puede editar, también necesitaría separación aquí.
+                // Por ahora, nos enfocamos en la creación.
+                await updateFacturaVenta(selectedFactura.factura_venta_id!, dataToSend);
                 showSuccessToast('¡Factura de venta actualizada con éxito!');
             } else {
-                await createFacturaVenta(formData as FacturaVenta);
+                // --- LÓGICA DE SEPARACIÓN PARA CREAR ---
+                const [serie, correlativoStr] = (formData.numero_completo_comprobante || '').split('-');
+                const correlativo = parseInt(correlativoStr, 10);
+
+                if (!serie || isNaN(correlativo)) {
+                    showErrorAlert('El formato del Nro. de Comprobante es inválido. Debe ser SERIE-NUMERO, ej: F001-12345.');
+                    return; 
+                }
+                
+                dataToSend = {
+                    ...formData,
+                    serie_comprobante: serie.trim(),
+                    numero_correlativo_comprobante: correlativo,
+                };
+                delete dataToSend.numero_completo_comprobante;
+                // --- FIN DE LA LÓGICA DE SEPARACIÓN ---
+
+                await createFacturaVenta(dataToSend as FacturaVenta);
                 showSuccessToast('¡Factura de venta creada con éxito!');
             }
+
             handleCloseModal();
             loadFacturas();
         } catch (error) {
@@ -475,6 +511,26 @@ const ListaFacturasVentaPage = () => {
                 loadFacturas();
             } catch (error) { 
                 if (error instanceof Error) showErrorAlert(error.message);
+            }
+        }
+    };
+
+    const handleEnviarSunat = async (facturaId: number) => {
+        const result = await showConfirmDialog(
+            'Confirmar Envío',
+            '¿Estás seguro de que quieres firmar y enviar este comprobante a la SUNAT? (Esta es una simulación)'
+        );
+
+        if (result.isConfirmed) {
+            try {
+                setLoading(true); // Mostramos un indicador de carga
+                const respuesta = await enviarFacturaASunat(facturaId);
+                showSuccessToast(respuesta.mensaje);
+                loadFacturas(); // Recargamos la lista para ver el estado actualizado
+            } catch (error) {
+                if (error instanceof Error) showErrorAlert(error.message);
+            } finally {
+                setLoading(false);
             }
         }
     };
@@ -573,6 +629,21 @@ const ListaFacturasVentaPage = () => {
                                                     💰
                                                 </button>
                                             )}
+                                            {/* Solo se muestra si la factura está en estado "Emitida" */}
+                                            {factura.estado_factura === 'Emitida' && (
+                                                <button 
+                                                    onClick={() => handleEnviarSunat(factura.factura_venta_id!)} 
+                                                    className="btn-icon" 
+                                                    title="Enviar a SUNAT (Simulación)"
+                                                    style={{ color: '#28a745' }} // Le damos un color verde
+                                                >
+                                                    <Send size={18} />
+                                                </button>
+                                            )}
+                                            
+                                            {Number(factura.saldo_pendiente_cobro) > 0 && (
+                                                <button onClick={() => handleAplicarSaldo(factura.factura_venta_id!)} className="btn-icon" title="Aplicar Saldo a Favor">💰</button>
+                                            )}
                                             <div className="dropdown-actions" ref={openDropdownId === factura.factura_venta_id ? dropdownRef : null}>
                                                 <button onClick={(e) => { e.stopPropagation(); setOpenDropdownId(factura.factura_venta_id === openDropdownId ? null : factura.factura_venta_id!); }} className="btn-icon" title="Descargar">⬇️</button>
                                                 <div className={`dropdown-content ${openDropdownId === factura.factura_venta_id ? 'open' : ''}`}>
@@ -606,9 +677,26 @@ const ListaFacturasVentaPage = () => {
                 <form onSubmit={handleSubmit} className="modal-form" noValidate>
                     <div className="form-grid">
                         {/* Datos de Cabecera */}
-                        <div className="form-group floating-label">
-                            <input id="numero_completo_comprobante" type="text" name="numero_completo_comprobante" value={selectedFactura?.numero_completo_comprobante || 'AUTOGENERADO'} disabled={true} placeholder=" " />
+                        {/* <div className="form-group floating-label">
+                            <select id="tipo_comprobante_venta_id" name="tipo_comprobante_venta_id" value={formData.tipo_comprobante_venta_id || ''} onChange={handleChange}>
+                                {tiposComprobanteVenta.map(tipo => (
+                                    <option key={tipo.id} value={tipo.id}>{tipo.descripcion}</option>
+                                ))}
+                            </select>
+                            <label htmlFor="tipo_comprobante_venta_id">Tipo Comprobante</label>
+                        </div> */}
+
+                        <div className="form-group floating-label"> {/* Ocupa todo el ancho */}
+                            <input 
+                                id="numero_completo_comprobante" 
+                                type="text" 
+                                name="numero_completo_comprobante" 
+                                value={formData.numero_completo_comprobante || ''} 
+                                onChange={handleChange} 
+                                required 
+                            />
                             <label htmlFor="numero_completo_comprobante">Nro. Comprobante</label>
+                            {formErrors.numero_completo_comprobante && <span className="error-text">{formErrors.numero_completo_comprobante}</span>}
                         </div>
                         <div className="form-group floating-label">
                             <select id="tipo_comprobante_venta_id" name="tipo_comprobante_venta_id" value={formData.tipo_comprobante_venta_id || ''} onChange={handleChange} disabled={isViewMode}>
@@ -617,10 +705,6 @@ const ListaFacturasVentaPage = () => {
                                 ))}
                             </select>
                             <label htmlFor="tipo_comprobante_venta_id">Tipo Comprobante</label>
-                        </div>
-                        <div className="form-group floating-label">
-                            <input id="serie_comprobante" type="text" name="serie_comprobante" value={formData.serie_comprobante || ''} onChange={handleChange} disabled={isViewMode} placeholder=" " required />
-                            <label htmlFor="serie_comprobante">Serie</label>
                         </div>
                         <div className="form-group floating-label">
                             <input id="fecha_emision" type="date" name="fecha_emision" value={formData.fecha_emision || ''} onChange={handleChange} disabled={isViewMode} placeholder=" " required />

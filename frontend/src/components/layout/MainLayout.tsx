@@ -93,7 +93,8 @@ const menuConfig = [
     { id: 'maestros', icon: <IconMasters />, title: 'Maestros', children: [
         { to: '/clientes', title: 'Clientes' },
         { to: '/proveedores', title: 'Proveedores' },
-        { to: '/servicios', title: 'Servicios' }
+        { to: '/servicios', title: 'Servicios' },
+        { to: '/centros-costo', title: 'Centros de Costo' } 
     ]},
 
     { id: 'reportes', icon: <IconReports />, title: 'Reportes', children: [
